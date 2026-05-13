@@ -7,5 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "deepxde>=1.15.0",
     "imageio>=2.37.3",
+    "numpy>=2.4.4",
+    "pyvista>=0.48.2",
     "torch>=2.12.0",
 ]
