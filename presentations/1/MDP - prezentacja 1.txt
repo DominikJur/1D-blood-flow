@@ -1,0 +1,126 @@
+Modelowanie Przepływu         Krwi w Sieciach Naczyń z Rozgałęzieniami
+Matematyka dla Przemysłu - prezentacja nr 1
+
+18 marca 2026
+
+Dominik Jur, Szymon Klim, Mirosław Myszka, Nikodem Drelak
+
+Wprowadzenie
+
+Krew jako płyn nieniutonowski
+Czym tak właściwie jest krew w ujęciu fizycznym?
+Jednymi z najważniejszych cech opisujących krew, są:
+złożona struktura - krew nie jest jednorodną cieczą, lecz zawiesiną elementów morfotycznych w osoczu.
+
+zmienna lepkość - w przeciwieństwie do wody, krew jest nieniutonowska, a jej lepkość zależy od prędkości ścinania i średnicy naczynia.
+
+efekt skali - w dużych tętnicach możemy modelować krew jako ciągły płyn, natomiast w małych naczyniach kluczowe stają się oddziaływania komórek ze sobą
+
+Geometria układu i pojęcie bifurkacji
+Architektura sieci naczyniowej
+Sieć naczyń jaką tworzy układ krwionośny to struktura o ogromnej złożoności, matematycznie opisywać będziemy ją poprzez graf połączonych segmentów.
+Bifurkacja (rozgałęzienia) stanie się kluczowym punktem kontrolnym przepływu, to tu naczynia główne dzielić się będą na mniejsze.
+
+Dlaczego badamy bifurkacje?
+
+Dlaczego bifurkacja?
+To właśnie w miejscach rozgałęzień najczęściej dochodzi do wszelkiego rodzaju zaburzeń przepływu, co sprzyja powstawaniu patologii, takich jak tętniaki czy blaszki miażdżycowe.
+
+Parametry fizyczne i wyzwania modelowania
+Co mierzymy i co obliczamy?
+Zmienne pierwotne:
+ciśnienie (p): siła napędowa przepływu
+prędkość (v): wektor opisujący tempo i kierunek przepływu
+Naprężenia ścinające (WSS): siła z jaką krew wywiera nacisk (“pociera”) na ścianki naczynia.
+Warunki brzegowe: ograniczenia wynikające z fizjologii (tj. tętno, opór obwodowy)
+
+Strategia modelowania: 3D vs 1D
+Kompromis pomiędzy dokładnością a czasem
+Modelowanie 3D (lokalne) : równania Naviera-Stokesa stosowane dla pojedynczych rozgałęzień, gdzie liczy się każdy szczegół.
+Modelowanie 1D (globalne): uproszczony opis fali ciśnienia wzdłuż osi naczynia. Umożliwia symulowanie całego krążenia.
+Nasze podejście: Postaramy się połączyć te dwa światy, aby uzyskać wiarygodne rozwiązania w rozsądnym czasie i z rozsądną dokładnością.
+
+Podstawowe pojęcia
+
+Hiperboliczny Model Sieciowy 1D
+
+Hiperboliczny Model Sieciowy 1D
+Pełny model zostanie wyprowadzony na następnych wykładach ale osiągamy go za pomocą:
+całkowania równań NS po przekroju, 
+założenia zachowania masy,
+założenia zachowania pędu.
+
+Charakterystyki i Niezmienniki Riemanna	
+Niezmiennik Riemanna
+Dla układu hiperbolicznego ∂u/∂t + A ∂u/∂x = 0 niezmienniki Riemanna to wielkości zachowujące się stale wzdłuż charakterystyk.
+Charakterystyka
+Charakterystyka to krzywa w płaszczyźnie (x, t), wzdłuż której propaguje się informacja. Dla ∂u/∂t + A ∂u/∂x = 0 charakterystyki spełniają dx/dt = a.  
+
+Metoda numeryczne
+Skorzystamy z metod numerycznych do rozwiązywania równań hiperbolicznych:
+Metoda elementów skończonych / Taylor–Galerkin
+Metoda skończonych objętości
+Metoda charakterystyk
+
+Metoda elementów skończonych / Taylor–Galerkin
+Rozwiązanie aproksymuje się kawałkami liniowymi na elementach 1D. W klasycznym FEM powstaje globalny układ równań z macierzą masową, kosztowny do rozwiązania. Schemat Taylor–Galerkin obchodzi ten problem: najpierw wykonuje rozwinięcie Taylora w czasie, a następnie stosuje sformułowanie Galerkina z diagonalną macierzą. 
+
+Sieci Neuronowe
+Sieci neuronowe  (NN) to metoda statystyczna umożliwiająca estymacje nieznanej funkcji na podstawie skończonego zbioru próbek.
+Są preferowaną metodą do estymacji nieznanych funkcji ponieważ dla każdej funkcji (całkowalnej w sensie Lebesque) istnieje sieć neuronowa która opisuję ją do dowolnej tolerancji błędu.
+Są uczone iteratywnie za pomocą algorytmów gradientowych.
+Najczęstsze NN (aktywacja ReLU) generują funkcje z rodziny funkcji łamanych.
+
+PINNs
+PINNs to sposób na uczenie sieci neuronowych za pomocą praw fizyki:
+Jeśli nasza sieć bada zjawisko którego model fizyczny znamy możemy karać ją za odbieganie od tego modelu,
+Wykorzystuje Propagacje Wsteczną do liczenia pochodnych cząstkowych,
+Pomaga w sytuacjach gdzie mamy mało/brak danych,
+Stosuje się je w:
+Medycynie
+Symulacjach fizycznych
+
+PINNs
+
+Znaczenie przemysłowe
+
+Inżynieria Biomedyczna i Projektowanie Sprzętu (MedTech)
+Optymalizacja implantów naczyniowych: Firmy produkujące stenty, sztuczne zastawki czy by-passy wykorzystują symulacje przepływu do testowania geometrii swoich produktów przed rozpoczęciem drogich badań klinicznych.
+Analiza rozgałęzień: Zrozumienie dynamiki płynów w bifurkacjach (rozgałęzieniach) pozwala projektować implanty, które minimalizują ryzyko zakrzepicy (powstającej w miejscach zaburzonego przepływu).
+Redukcja kosztów R&D: Prototypowanie "in silico" (w środowisku komputerowym) znacząco skraca czas wprowadzania nowych urządzeń medycznych na rynek.
+
+Oprogramowanie Diagnostyczne i Ograniczenia Obliczeniowe (IT)
+Problem skali w diagnostyce: Pełne trójwymiarowe obliczenia dla całego układu krwionośnego są praktycznie niemożliwe ze względu na skalę problemu.
+Rozwiązanie dla branży IT: Firmy tworzące oprogramowanie medyczne stosują kompromis w postaci modeli jednowymiarowych.
+Korzyść przemysłowa: Uproszczenie to pozwala zachować kluczową fizykę propagacji fal ciśnienia i przepływu, a jednocześnie nadaje się do symulacji dużych sieci w rozsądnym czasie obliczeniowym. Dzięki temu lekarz może otrzymać wynik symulacji w kilka minut, a nie dni.
+
+
+
+Co dalej?
+
+Plan dalszych prezentacji
+Prezentacja 2 - rozwinięcie modeli matematycznych:
+Wprowadzenie równań Naviera-Stokesa w kontekście hemodynamiki.
+Modelowanie krwi jako płynu nieniutonowskiego.
+Definicja geometrii rozgałęzienia (bifurkacji) i przyjęte założenia fizyczne.
+Prezentacje 3 i 4 - analiza teoretyczna:
+Wyprowadzenie słabego sformułowania problemu. Dowody istnienia i jednoznaczności rozwiązań dla przyjętych równań różniczkowych.
+Analiza teoretyczna warunków brzegowych i początkowych specyficznych dla bifurkacji (np. spadek ciśnienia).
+
+Plan dalszych prezentacji
+Prezentacja 5 i 6 - implementacja numeryczna i interpretacja wyników:
+Dyskretyzacja problemu z użyciem wybranych metod.
+Przeprowadzenie symulacji komputerowych dla różnych kątów bifurkacji i właściwości reologicznych krwi.
+Analiza naprężeń ścinających na ściankach naczyń i identyfikacja stref recyrkulacji.
+Prezentacja 7 - podsumowująca:
+Synteza uzyskanych wyników symulacji i analizy matematycznej.
+Omówienie ograniczeń modelu.
+Kierunki dalszych badań i wnioski praktyczne.
+
+
+Dziękujemy za uwagę
+
+Źródła
+D. Kim, J. Tithof. One-Dimensional Modeling of Blood Flow: A Comprehensive Yet Concise Review (2025).
+https://en.wikipedia.org/wiki/Bifurcation_theory
+Narzędzia AI (Google Gemini)

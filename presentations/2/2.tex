@@ -1,0 +1,495 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- PAKIETY ---
+\usepackage[utf8]{inputenc}
+
+% Set Google Sans as the main font for the document
+\usepackage{amsmath, amsfonts, amssymb, amsbsy}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{circuitikz}
+%\usefonttheme{serif}
+
+
+
+% ======================= STARY MOTYW ========================
+\usepackage{comment}
+\begin{comment}
+% --- MOTYW I NAWIGACJA ---
+\usetheme{default}
+\setbeamertemplate{navigation symbols}{} % Usunięcie nawigacji
+\setbeamercovered{transparent}
+% --- DEFINICJE KOLORÓW ---
+\definecolor{darkgray}{RGB}{50,50,50}
+\definecolor{lightgray}{RGB}{245,245,245}
+\definecolor{accentred}{RGB}{220,20,60} % Nieco żywsza czerwień (Crimson)
+
+% --- USTAWIENIA KOLORÓW BEAMERA ---
+\setbeamercolor{normal text}{fg=darkgray, bg=white}
+\setbeamercolor{structure}{fg=darkgray} % Kolor podstawowych elementów (np. tytuł)
+
+\setbeamercolor{title}{fg=darkgray}
+\setbeamercolor{frametitle}{fg=darkgray}
+
+\setbeamercolor{itemize item}{fg=accentred}
+\setbeamercolor{enumerate item}{fg=accentred}
+\setbeamercolor{section in toc}{fg=accentred} % Czerwień w spisie treści
+
+\setbeamercolor{block title}{bg=accentred, fg=white}
+\setbeamercolor{block body}{bg=lightgray, fg=darkgray}
+
+%
+% --- ZMODYFIKOWANY TYTUŁ SLAJDU Z CZERWONĄ LINIĄ ---
+\setbeamertemplate{frametitle}{
+    \vspace{0.4cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.3cm]{frametitle}
+        \usebeamerfont{frametitle}\insertframetitle
+        \vspace{0.1cm}
+        \color{accentred}\rule{\textwidth}{1pt}
+    \end{beamercolorbox}
+    \vspace{0.2cm}
+}
+\end{comment}
+% ============================================================
+
+
+% ======================= NOWY MOTYW ========================
+% --- MOTYW I NAWIGACJA ---
+\usetheme[sectionpage=simple]{moloch} % modern fork of the metropolis theme
+\usefonttheme[onlymath]{serif}
+
+% --- DEFINICJE KOLORÓW ---
+\definecolor{darkgray}{RGB}{50,50,50}
+\definecolor{lightgray}{RGB}{245,245,245}
+\definecolor{accentred}{RGB}{170, 0, 35} % Nieco żywsza czerwień (Crimson)
+
+% --- USTAWIENIA KOLORÓW BEAMERA ---
+% Główna paleta motywu (często kontroluje tło i tekst elementów wyróżnionych)
+\setbeamercolor{palette primary}{bg=accentred, fg=white}
+
+% Podstawowy tekst i tło slajdów
+\setbeamercolor{normal text}{fg=darkgray, bg=white}
+\setbeamercolor{structure}{fg=accentred} % Kontroluje m.in. wypunktowania i paski postępu
+
+% Tytuły slajdów (paski na górze)
+\setbeamercolor{title}{fg=darkgray}
+\setbeamercolor{frametitle}{bg=accentred, fg=white} % <-- Biały tekst na czerwonym tle
+
+% Slajdy przejściowe sekcji (\section{})
+\setbeamercolor{section title}{fg=accentred} % <-- tekst dla tytułów sekcji na slajdach przejściowych
+
+% Elementy list i spisu treści
+\setbeamercolor{itemize item}{fg=accentred}
+\setbeamercolor{enumerate item}{fg=accentred}
+\setbeamercolor{section in toc}{fg=accentred} % Czerwień w spisie treści
+
+% Bloki tekstowe
+\setbeamercolor{block title}{bg=accentred, fg=white}
+\setbeamercolor{block body}{bg=lightgray, fg=darkgray}
+
+% Konfiguracja nawigacji i bloków
+\setbeamertemplate{navigation symbols}{} % Usunięcie nawigacji
+\setbeamercovered{transparent}
+\setbeamertemplate{blocks}[rounded][shadow=false] % zaokrąglone rogi w blokach
+
+% ===========================================================
+
+
+
+% --- INFORMACJE O PREZENTACJI ---
+\title{Modelowanie przepływu krwi przez naczynia z rozgałęzieniami}
+\author{Drelak, Klim, Jur, Myszka}
+\date{\today}
+
+\begin{document}
+
+% --- SLAJD TYTUŁOWY ---
+\begin{frame}[plain]
+    \vfill
+    \noindent
+    \begin{beamercolorbox}[sep=0pt, wd=0.8\textwidth]{title}
+        \usebeamerfont{title}\inserttitle\par
+        \ifx\insertsubtitle\@empty\else
+            \vskip0.25em
+            {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}
+        \fi
+        \vskip0.5em
+        {\color{accentred}\rule{0.6\textwidth}{2pt}}
+        \vskip1em
+    \end{beamercolorbox}
+    
+    \begin{beamercolorbox}[sep=0pt, wd=0.8\textwidth]{author}
+        \usebeamerfont{author}\insertauthor\par
+        \vskip0.25em
+        \usebeamerfont{institute}\insertinstitute\par
+        \vskip0.25em
+        \usebeamerfont{date}\insertdate
+    \end{beamercolorbox}
+    \vfill
+\end{frame}
+
+% --- SPIS TREŚCI ---
+\begin{frame}{Zarys prezentacji}
+    \tableofcontents
+\end{frame}
+
+
+\section{Wyprowadzenie równań rządzących}
+
+\begin{frame}{Segment naczynia}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      Rozważamy przepływ przez \textbf{podatne naczynie} wzdłuż osi $z$.\\[0.8em]
+      Trzy zmienne opisują stan:
+      \begin{itemize}
+        \item $A(z,t)$ – pole przekroju poprzecznego
+        \item $P(z,t)$ – ciśnienie wewnętrzne
+        \item $Q(z,t)$ – objętościowe natężenie przepływu
+      \end{itemize}
+      \vspace{0.8em}
+      \textbf{Założenia modelu 1D:}
+      \begin{itemize}
+        \item krew nieściśliwa ($\rho = \text{const}$)
+        \item przepływ newtonowski ($\mu = \text{const}$)
+        \item ruch tylko do przodu
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{Fig1_singlebloodvessel2.pdf}
+        \caption*{\small Segment podatnej tętnicy.}
+      \end{figure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Zachowanie masy}
+  Ogólne równanie ciągłości dla płynu:
+  \[
+    \frac{\partial \rho}{\partial t} + \nabla \cdot (\rho\,\mathbf{u}) = 0
+    \quad \xrightarrow{\;\rho=\text{const}\;} \quad
+    \nabla \cdot \mathbf{u} = 0.
+  \]
+  \vspace{0.3em}
+  We współrzędnych cylindrycznych $\mathbf{u}=(v_r, v_\theta, v_z)$,\\
+  przy założeniu braku wirowania ($v_\theta=0$) i symetrii osiowej ($\tfrac{\partial}{\partial\theta}=0$) mamy:
+    \[
+      \frac{\partial v_z}{\partial z}
+      + \frac{1}{r}\frac{\partial}{\partial r}(r v_r) = 0.
+    \]
+  \vspace{0.3em}
+  \textbf{Cel:} scałkować to równanie po przekroju $[0, R]$,\\
+  aby otrzymać zależność między $A$ i $Q$.
+\end{frame}
+
+\begin{frame}{Zachowanie masy}
+  Mnożymy przez $2\pi r$ i całkujemy po $r$ od $0$ do $R$, stosując regułę Leibniza:
+  \[
+    2\pi\frac{\partial}{\partial z}\int_{0}^{R} v_z r\,dr
+    - 2\pi\frac{\partial R}{\partial z}[r v_z]_{r=R}
+    + 2\pi[r v_r]_{r=R} = 0.
+  \]
+  \vspace{0.2em}
+  Korzystamy z definicji $Q = 2\pi\!\int_0^R v_z r\,dr$, więc pierwszy składnik daje $\frac{\partial Q}{\partial z}$.\\[0.5em]
+
+  \textbf{Warunek braku poślizgu}: $v_z(r=R)=0$ $\;\Rightarrow\;$ drugi składnik $= 0$.\\[0.3em]
+  \textbf{Prędkość ściany}: $v_r(r=R)=\frac{\partial R}{\partial t}$, a $A=\pi R^2$, stąd:
+  \[
+    2\pi[r v_r]_{r=R} = 2\pi R\,\frac{\partial R}{\partial t} = \frac{\partial A}{\partial t}.
+  \]
+    \[\boxed{
+      \frac{\partial A}{\partial t} + \frac{\partial Q}{\partial z} = 0.}
+    \]
+\end{frame}
+
+\begin{frame}{Zachowanie pędu – równanie NS w osi}
+  Z założeń (długofalowe przybliżenie, $\frac{\partial P}{\partial r}=0$) pełne równanie NS redukuje się do postaci osiowej:
+    \[
+      \rho\!\left(\frac{\partial v_z}{\partial t}
+      + v_r\frac{\partial v_z}{\partial r}
+      + v_z\frac{\partial v_z}{\partial z}\right)
+      = -\frac{\partial P}{\partial z}
+      + \frac{\mu}{r}\frac{\partial}{\partial r}\!\left(r\frac{\partial v_z}{\partial r}\right).
+    \]
+  \vspace{0.5em}
+  Analogicznie jak dla masy: całkujemy przez $2\pi r$ po $r\in[0,R]$.\\[0.5em]
+  Uzyskujemy trzy grupy składników:
+  \begin{enumerate}
+    \item \textbf{Inercja} (zmiana pędu w czasie) $\;\to\; \dfrac{\partial Q}{\partial t}$
+    \item \textbf{Adwekcja} (przeniesienie pędu) $\;\to\; \dfrac{\partial}{\partial z}\!\left(\alpha\dfrac{Q^2}{A}\right)$
+    \item \textbf{Ciśnienie + lepkość} $\;\to\; \dfrac{A}{\rho}\dfrac{\partial P}{\partial z} + K_R\dfrac{Q}{A}$
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Człon adwekcyjny i współczynnik $\alpha$}
+  Po całkowaniu przez części i zastosowaniu równania ciągłości:
+  \[
+    2\pi\int_0^R\!\left(r v_r\frac{\partial v_z}{\partial r}
+    +r v_z\frac{\partial v_z}{\partial z}\right)dr
+    = 2\pi\frac{\partial}{\partial z}\int_0^R r\,v_z^2\,dr.
+  \]
+  Definiujemy:
+  \[
+    2\pi\int_0^R r\,v_z^2\,dr \;=\; \alpha\,\frac{Q^2}{A},
+  \]
+  gdzie \textbf{współczynnik korekcji pędu} $\alpha$ zależy od profilu prędkości.
+
+  \vspace{0.4em}
+  Kluczowa wielkość: \textbf{liczba Womersleya}
+  \[
+    Wo = R\sqrt{\frac{\rho\,\omega}{\mu}}.
+  \]
+
+\end{frame}
+
+\begin{frame}{Człon adwekcyjny i współczynnik $\alpha$}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}
+        \item $Wo \gg 1$ (duże tętnice): profil płaski, $\alpha = 1$
+        \item $Wo \ll 1$ (małe naczynia): profil paraboliczny, $\alpha = \tfrac{4}{3}$
+      \end{itemize}
+      \vspace{0.3em}
+      W modelu 1D przyjmujemy \textbf{$\alpha = 1$}.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{Fig2_Womersleys.pdf}
+        \caption{\tiny Profile prędkości dla różnych $Wo$.}
+      \end{figure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Człon ciśnieniowy i lepkościowy}
+  \textbf{Gradient ciśnienia} ($\frac{\partial P}{\partial r}=0$, całkowanie proste):
+  \[
+    2\pi\int_0^R \frac{r}{\rho}\frac{\partial P}{\partial z}\,dr
+    = \frac{A}{\rho}\frac{\partial P}{\partial z}.
+  \]
+
+  \textbf{Człon lepkościowy} – przy założeniu \textbf{przepływu Poiseuille'a}\\
+  (profil paraboliczny), naprężenie ścinające na ściance:
+  \[
+    \tau_w = \mu\left.\frac{\partial v_z}{\partial r}\right|_{r=R}
+    = -\frac{4\mu Q}{\pi R^3}
+    \quad\Longrightarrow\quad
+    2\pi\int_0^R\frac{\mu}{\rho}\frac{\partial}{\partial r}\!\left(r\frac{\partial v_z}{\partial r}\right)dr
+    = -K_R\frac{Q}{A},
+  \]
+  gdzie
+  \[
+    K_R = 8\pi\frac{\mu}{\rho} \quad (\gamma=2),
+    \qquad
+    K_R = 22\pi\frac{\mu}{\rho} \quad (\gamma=9,\;\text{profil spłaszczony}).
+  \]
+  Postać ogólna dla profilu $v_z = U\frac{\gamma+2}{\gamma}\!\left[1-\!\left(\frac{r}{R}\right)^\gamma\right]$ daje $K_R = 2(\gamma+2)\pi\frac{\mu}{\rho}$.
+\end{frame}
+
+\begin{frame}{1D równanie zachowania pędu}
+  Łącząc wszystkie scałkowane składniki:
+  \begin{block}{1D równanie pędu (Naviera-Stokesa zredukowane)}
+    \[
+      \frac{\partial Q}{\partial t}
+      + \frac{\partial}{\partial z}\!\left(\alpha\frac{Q^2}{A}\right)
+      + \frac{A}{\rho}\frac{\partial P}{\partial z}
+      = -K_R\frac{Q}{A}.
+    \]
+  \end{block}
+  \vspace{0.5em}
+  Człony po lewej stronie odpowiadają kolejno:
+  \begin{itemize}
+    \item \textbf{inercji} – zmiana natężenia przepływu w czasie,
+    \item \textbf{adwekcji} – przeniesienie pędu wzdłuż naczynia,
+    \item \textbf{gradientowi ciśnienia} – siła napędowa przepływu.
+  \end{itemize}
+  Prawa strona to \textbf{tarcie lepkościowe} ze ścianką naczynia (źródło).
+\end{frame}
+
+\begin{frame}{Układ równań rządzących 1D}
+  Przy założeniu $\alpha = 1$ (duże $Wo$), układ dwóch równań różniczkowych cząstkowych:
+  \begin{block}{Model 1D przepływu krwi $(A,\,Q)$}
+    \[
+      \frac{\partial A}{\partial t} + \frac{\partial Q}{\partial z} = 0,
+    \]
+    \[
+      \frac{\partial Q}{\partial t}
+      + \frac{\partial}{\partial z}\!\left(\frac{Q^2}{A}\right)
+      + \frac{A}{\rho}\frac{\partial P}{\partial z}
+      = -K_R\frac{Q}{A}.
+    \]
+  \end{block}
+\end{frame}
+
+\section{Równanie konstytutywne i domknięcie układu}
+
+\begin{frame}{Problem domknięcia układu}
+    \begin{itemize}
+        \item Wyprowadzone równania Naviera-Stokesa dla modelu 1D dają nam układ dwóch równań:
+        \begin{enumerate}
+            \item Równanie zachowania masy
+            \item Równanie zachowania pędu
+        \end{enumerate}
+        \item Mamy jednak \textbf{trzy niewiadome}:
+        \begin{itemize}
+            \item $A$ -- pole przekroju poprzecznego
+            \item $Q$ -- objętościowe natężenie przepływu
+            \item $P$ -- ciśnienie wewnętrzne
+        \end{itemize}
+        \item \textbf{Wniosek:} Brakuje nam jednego równania, aby układ był w pełni rozwiązywalny. Potrzebujemy zależności wiążącej ciśnienie z polem przekroju naczynia.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Równanie konstytutywne (Prawo rury)}
+    Aby domknąć układ, zakłada się, że ściana naczynia jest elastyczna. Wprowadza się nieliniowe równanie stanu, tzw. \textbf{prawo rury}:
+    \begin{block}{Zależność ciśnienie-przekrój}
+        $$P = P_{ext} + \beta(\sqrt{A} - \sqrt{A_0})$$
+    \end{block}
+    \vspace{0.3cm}
+    Gdzie:
+    \begin{itemize}
+        \item $P_{ext}$ -- ciśnienie zewnętrzne (tkankowe),
+        \item $A_0$ -- pole przekroju w stanie spoczynkowym (równowagi, bez ciśnienia transmyralnego),
+        \item $\beta$ -- parametr określający sztywność (podatność) ściany naczynia.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Właściwości mechaniczne naczynia (parametr $\beta$)}
+    Parametr $\beta$ zależy bezpośrednio od właściwości fizycznych i mechanicznych samej tkanki budującej naczynie:
+    $$\beta = \frac{\sqrt{\pi} h E}{A_0 (1-\nu^2)}$$
+    \vspace{0.2cm}
+    Składniki wzoru:
+    \begin{itemize}
+        \item $h$ -- grubość ściany naczynia,
+        \item $E$ -- moduł Younga (miara sztywności materiału),
+        \item $\nu$ -- współczynnik Poissona. Ponieważ tkankę naczyniową uważa się za nieściśliwą, zazwyczaj przyjmuje się $\nu = 0.5$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Uproszczenie gradientu ciśnienia}
+    Aby włączyć "prawo rury" do równania pędu, obliczamy pochodną ciśnienia $P$ po osi $z$:
+    $$\frac{\partial P}{\partial z} = \frac{\partial P_{ext}}{\partial z} + \frac{\partial \beta}{\partial z}(\sqrt{A} - \sqrt{A_0}) + \beta\left(\frac{1}{2\sqrt{A}}\frac{\partial A}{\partial z} - \frac{1}{2\sqrt{A_0}}\frac{\partial A_0}{\partial z}\right)$$
+
+    W typowych symulacjach wprowadzamy założenia upraszczające:
+    \begin{itemize}
+        \item Właściwości materiałowe ($A_0$, $\beta$) są stałe na danym segmencie ($\frac{\partial A_0}{\partial z} = 0$, $\frac{\partial \beta}{\partial z} = 0$).
+        \item Ciśnienie zewnętrzne jest stałe i często zerowane ($P_{ext} = 0$).
+    \end{itemize}
+    \begin{block}{Zredukowany gradient ciśnienia}
+        $$\frac{\partial P}{\partial z} = \frac{\beta}{2\sqrt{A}}\frac{\partial A}{\partial z}$$
+    \end{block}
+    Dzięki temu redukujemy zmienne i domykamy model, co pozwala na łączenie segmentów w rozgałęzienia!
+\end{frame}
+
+\section{Ograniczenia założeń fluidalnych: Krew nieniutonowska}
+
+\begin{frame}{Rewizja założeń: Czy $\mu$ faktycznie jest stałe?}
+    We wcześnie omówionym wyprowadzeniu równań dla modelu 1D przyjęto, że krew jest płynem newtonowskim (o stałej lepkości, $\mu = \text{const}$). W rzeczywistości jest to duże uproszczenie.
+
+    \vspace{0.3cm}
+    \textbf{Fizyczna natura krwi:}
+    \begin{itemize}
+        \item Krew nie jest jednorodną cieczą, lecz złożoną zawiesiną komórek (głównie erytrocytów) w osoczu.
+        \item Wykazuje silne właściwości \textbf{nieniutonowskie} – jej lepkość maleje wraz ze wzrostem prędkości ścinania (zjawisko tzw. \textit{shear-thinning}).
+        \item Przy niskich prędkościach przepływu krwinki ulegają agregacji (tworzą rulony), co sprawia, że krew stawia znacznie większy opór lepki.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Jak nieniutonowskość modyfikuje uśrednione parametry?}
+    Zmienna lepkość komplikuje obraz wcześniej zdefiniowanych współczynników dla modelu 1D:
+
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Zaburzenie profilu prędkości:} Zjawisko \textit{shear-thinning} naturalnie spłaszcza profil prędkości (krew w osi naczynia płynie jak sztywny czop). Wymusza to numeryczne podniesienie wartości współczynnika $\gamma$ (np. $\gamma=9$), niezależnie od liczby Womersleya ($Wo$).
+        \item \textbf{Lokalna zmienność oporu:} Zdefiniowany wcześniej człon lepkiego tarcia ($K_R$) przestaje być stałą wartością. Zmienia się dynamicznie w trakcie trwania pojedynczego uderzenia serca, reagując na chwilowe wahania lepkości lokalnej.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Granice modelu 1D a reologia krwi}
+    \begin{block}{Gdzie założenie o stałym $\mu$ się sprawdza?}
+        Dopóki analizujemy proste odcinki dużych tętnic, prędkości ścinania są na tyle wysokie, że krew "rozrzedza się"~ do stałej, asymptotycznej wartości lepkości. W takich obszarach model 1D jest w pełni wystarczający i numerycznie bardzo wydajny.
+    \end{block}
+
+    \vspace{0.3cm}
+
+    \begin{block}{Dlaczego potrzebujemy czegoś więcej?}
+        Pełna, nieniutonowska natura krwi ujawnia się punktowo – tam, gdzie przepływ zwalnia (spada prędkość ścinania), a krew gwałtownie "gęstnieje". Ujęcie tych silnie zlokalizowanych zjawisk reologicznych poprzez model jedno-wymiarowy (uśredniony dla całego przekroju) jest fizycznie niemożliwe.
+    \end{block}
+\end{frame}
+
+\begin{frame}{Przejście do analizy geometrycznej}
+    Widzimy więc, że model 1D napotyka barierę wynikającą z fizycznych właściwości samego płynu. Jednak największe wyzwanie leży gdzie indziej.
+
+    \vspace{0.3cm}
+    Gdzie w układzie krwionośnym najczęściej dochodzi do nagłych spadków prędkości, w których zmienna lepkość wyrządza największe szkody (np. promując zakrzepicę)? 
+
+    \vspace{0.3cm}
+    Odpowiedzią jest \textbf{złożona geometria układu}. Aby w pełni zrozumieć, dlaczego modele uśrednione 1D zawodzą na rzecz pełnych modeli 3D, musimy przyjrzeć się temu, co dzieje się, gdy naczynia przestają być prostą rurą, a zaczynają się łączyć i dzielić...
+\end{frame}
+
+\section{Geometria bifurkacji i założenia fizyczne}
+
+\begin{frame}{Geometria bifurkacji – Definicja formalna}
+    \begin{itemize}
+        \item \textbf{Reprezentacja sieci:} Rozgałęzienia naczyń są powszechnym zjawiskiem w układzie tętniczym (np. rozgałęzienia aorty) i w modelu 1D wymagają specjalnego uwzględnienia.
+        \item \textbf{Bifurkacja jako węzeł grafu:} Odejście naczynia modeluje się jako punkt węzłowy łączący jedno naczynie macierzyste dzielące się na dwa naczynia pochodne.
+        \item \textbf{Oznaczenia:}
+        \begin{itemize}
+            \item Naczynie macierzyste – oznaczane indeksem \textbf{$p$} (\textit{parent vessel}).
+            \item Naczynia pochodne (córki) – oznaczane indeksami \textbf{$d_1, d_2$} (\textit{daughter vessels}).
+        \end{itemize}
+        \item W punktach rozgałęzień (węzłach) zazwyczaj mamy do czynienia z nieciągłościami właściwości materiałowych (np. podatności) lub zmiany początkowego pola przekroju ($A_0$) naczyń.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Warunki spójności – Zachowanie masy i pędu}
+    Aby rozwiązać układ równań w węźle bifurkacji, stosuje się fundamentalne prawa zachowania:
+
+    \vspace{0.3cm}
+    \begin{block}{1. Zachowanie masy (ciągłość przepływu)}
+        \[ Q_p = Q_{d1} + Q_{d2} \]
+        \textbf{Uzasadnienie fizyczne:} Strumień masy przepływającej przez węzeł musi być ciągły. Biorąc pod uwagę fakt, że krew modelujemy jako płyn nieściśliwy, a sam węzeł z definicji nie ma objętości (nie może gromadzić płynu), objętość napływająca musi być równa odpływającej.
+    \end{block}
+\end{frame}
+
+\begin{frame}{Warunki spójności – Zachowanie masy i pędu}
+    \begin{block}{2. Ciągłość całkowitego ciśnienia}
+        \[ P_p + \frac{1}{2}\rho \left(\frac{Q_p}{A_p}\right)^2 = P_{d1} + \frac{1}{2}\rho \left(\frac{Q_{d1}}{A_{d1}}\right)^2 = P_{d2} + \frac{1}{2}\rho \left(\frac{Q_{d2}}{A_{d2}}\right)^2 \]
+        \textbf{Uzasadnienie fizyczne:} Całkowite ciśnienie (składające się z wkładu ciśnienia statycznego rozciągającego ścianki oraz ciśnienia dynamicznego wynikającego z prędkości płynu) musi być ciągłe we wszystkich naczyniach połączonych w danym węźle. Równanie to wynika wprost z zachowania energii i pędu płynu na połączeniu.
+    \end{block}
+\end{frame}
+
+\begin{frame}{Ograniczenia modelu 1D wobec geometrii 3D}
+    Modele 1D wykazują szczególne ograniczenia podczas analizy przepływu przez złożone rozgałęzienia:
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Uśrednienie poprzeczne:} Ze swojej natury dostarczają jedynie uśrednionych informacji w płaszczyźnie prostopadłej do osi naczynia.
+        \item \textbf{Ignorowanie trójwymiarowej dynamiki:} Model jedno-wymiarowy nie jest w stanie uchwycić skomplikowanych zjawisk w 3D, w tym stref recyrkulacji krwi, złożonych zawirowań czy ukształtowania przepływów wtórnych na rozwidleniach.
+        \item \textbf{Brak ujęcia kąta gałęzi:} Definicja węzła nie uwzględnia kąta rozwidlenia, co w pełnej geometrii 3D ma kluczowy wpływ na rozkłady naprężeń ścinających na ściankach (np. w patogenezie miażdżycy) i generuje dodatkowe, lokalne straty ciśnienia.
+    \end{itemize}
+\end{frame}
+\begin{frame}{Ograniczenia modelu 1D wobec geometrii 3D}
+    \begin{block}{Wniosek}
+        O ile symulacja 1D bardzo wydajnie radzi sobie z globalną analizą propagacji fali tętna, o tyle pomija lokalną, złożoną hemodynamikę 3D wymagającą rozwiązywania pełnych równań Naviera-Stokesa.
+    \end{block}
+\end{frame}
+
+% --- LITERATURA ---
+\begin{frame}{Literatura}
+    \nocite{*}
+    \bibliographystyle{unsrt}
+    \bibliography{zrodla}
+    \vspace{1em}
+    \centering
+\end{frame}
+
+\begin{frame}[standout]
+    Dziękujemy za uwagę!
+\end{frame}
+
+
+\end{document}

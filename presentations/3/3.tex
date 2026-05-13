@@ -1,0 +1,468 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- PAKIETY ---
+\usepackage[utf8]{inputenc}
+
+% Set Google Sans as the main font for the document
+\usepackage{amsmath, amsfonts, amssymb, amsbsy}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{circuitikz}
+%\usefonttheme{serif}
+
+
+% --- MOTYW I NAWIGACJA ---
+\usetheme[sectionpage=simple]{moloch} % modern fork of the metropolis theme
+\usefonttheme[onlymath]{serif}
+
+% --- DEFINICJE KOLORÓW ---
+\definecolor{darkgray}{RGB}{50,50,50}
+\definecolor{lightgray}{RGB}{245,245,245}
+\definecolor{accentred}{RGB}{170, 0, 35} % Nieco żywsza czerwień (Crimson)
+
+% --- USTAWIENIA KOLORÓW BEAMERA ---
+% Główna paleta motywu (często kontroluje tło i tekst elementów wyróżnionych)
+\setbeamercolor{palette primary}{bg=accentred, fg=white}
+
+% Podstawowy tekst i tło slajdów
+\setbeamercolor{normal text}{fg=darkgray, bg=white}
+\setbeamercolor{structure}{fg=accentred} % Kontroluje m.in. wypunktowania i paski postępu
+
+% Tytuły slajdów (paski na górze)
+\setbeamercolor{title}{fg=darkgray}
+\setbeamercolor{frametitle}{bg=accentred, fg=white} % <-- Biały tekst na czerwonym tle
+
+% Slajdy przejściowe sekcji (\section{})
+\setbeamercolor{section title}{fg=accentred} % <-- tekst dla tytułów sekcji na slajdach przejściowych
+
+% Elementy list i spisu treści
+\setbeamercolor{itemize item}{fg=accentred}
+\setbeamercolor{enumerate item}{fg=accentred}
+\setbeamercolor{section in toc}{fg=accentred} % Czerwień w spisie treści
+
+% Bloki tekstowe
+\setbeamercolor{block title}{bg=accentred, fg=white}
+\setbeamercolor{block body}{bg=lightgray, fg=darkgray}
+
+% Konfiguracja nawigacji i bloków
+\setbeamertemplate{navigation symbols}{} % Usunięcie nawigacji
+\setbeamercovered{transparent}
+\setbeamertemplate{blocks}[rounded][shadow=false] % zaokrąglone rogi w blokach
+
+% ===========================================================
+
+
+
+% --- INFORMACJE O PREZENTACJI ---
+\title{Modelowanie przepływu krwi przez naczynia z rozgałęzieniami}
+\author{Drelak, Klim, Jur, Myszka}
+\date{\today}
+
+\begin{document}
+
+% --- SLAJD TYTUŁOWY ---
+\begin{frame}[plain]
+    \vfill
+    \noindent
+    \begin{beamercolorbox}[sep=0pt, wd=0.8\textwidth]{title}
+        \usebeamerfont{title}\inserttitle\par
+        \ifx\insertsubtitle\@empty\else
+            \vskip0.25em
+            {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}
+        \fi
+        \vskip0.5em
+        {\color{accentred}\rule{0.6\textwidth}{2pt}}
+        \vskip1em
+    \end{beamercolorbox}
+    
+    \begin{beamercolorbox}[sep=0pt, wd=0.8\textwidth]{author}
+        \usebeamerfont{author}\insertauthor\par
+        \vskip0.25em
+        \usebeamerfont{institute}\insertinstitute\par
+        \vskip0.25em
+        \usebeamerfont{date}\insertdate
+    \end{beamercolorbox}
+    \vfill
+\end{frame}
+
+% --- SPIS TREŚCI ---
+\begin{frame}{Zarys prezentacji}
+    \tableofcontents
+\end{frame}
+
+
+\section{Postać zachowawcza i zmienne charakterystyczne}
+
+\begin{frame}{Przypomnienie: układ równań}
+  \begin{columns}
+    \begin{column}{0.52\textwidth}
+      \begin{block}{Równania w zmiennych $(A,Q)$}
+        \[
+          \frac{\partial A}{\partial t} + \frac{\partial Q}{\partial z} = 0
+        \]
+        \[
+          \frac{\partial Q}{\partial t} + \frac{\partial}{\partial z}\!\left(\frac{Q^2}{A}\right) + \frac{A}{\rho}\frac{\partial P}{\partial z} = -K_R\frac{Q}{A}
+        \]
+      \end{block}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{block}{Prawo rury}
+        \[
+          P = P_{ext} + \beta(\sqrt{A}-\sqrt{A_0})
+        \]
+        \[
+          \frac{\partial P}{\partial z} = \frac{\beta}{2\sqrt{A}}\frac{\partial A}{\partial z}
+        \]
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.6em}
+  \centering
+  Podstawiając $u = Q/A$, sprowadzamy układ do \textbf{postaci zachowawczej}.
+\end{frame}
+
+\begin{frame}{Postać zachowawcza i jakobian przepływu}
+  Niech $U = \begin{bmatrix}A\\u\end{bmatrix}$, $F(U) = \begin{bmatrix}Au\\ \dfrac{u^2}{2} + \dfrac{P}{\rho}\end{bmatrix}$, $S(U) = \begin{bmatrix}0\\ -K_R\dfrac{u}{A}\end{bmatrix}$.
+
+  \vspace{0.4em}
+  \[
+    \boxed{\frac{\partial U}{\partial t} + \frac{\partial F(U)}{\partial z} = S(U)}
+  \]
+
+  \vspace{0.4em}
+  \begin{block}{Jakobian $J(U) = \dfrac{\partial F}{\partial U}$}
+    \[
+      J(U) = \begin{bmatrix} u & A \\[6pt] \dfrac{\beta}{2\rho\sqrt{A}} & u \end{bmatrix}
+    \]
+  \end{block}
+\end{frame}
+
+\begin{frame}{Wartości własne i ścisła hiperboliczność}
+  \begin{block}{Równanie charakterystyczne $\det(J-\lambda I)=0$}
+    \[
+      \lambda_{1,2} = u \pm c,\qquad 
+      c = \sqrt{\frac{\beta}{2\rho}\sqrt{A}}
+    \]
+  \end{block}
+
+  \vspace{0.3em}
+  $c$ -- \textbf{prędkość Moensa-Kortewega} (prędkość propagacji zaburzeń).
+
+  \vspace{0.5em}
+  \begin{block}{Ścisła hiperboliczność}
+    Dla $A,\rho,\beta > 0$ wartości własne są rzeczywiste i różne:
+    \[
+      \lambda_1 = u+c > 0,\qquad \lambda_2 = u-c < 0
+    \]
+    Układ jest \textbf{ściśle hiperboliczny}.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Lewe wektory własne i zmienne charakterystyczne}
+      \begin{block}{Macierz lewych wektorów własnych}
+        \[ LJ = \Lambda L, \quad \text{spełnione przez} \quad
+          L = \begin{bmatrix} \dfrac{c}{A} & 1 \\[8pt] -\dfrac{c}{A} & 1 \end{bmatrix},
+        \]
+        tutaj $\Lambda = \begin{bmatrix} \lambda_1 & 0 \\[8pt] 0& \lambda_2 \end{bmatrix}$.
+      \end{block}
+\end{frame}
+
+\section{Niezmienniki Riemanna i metoda charakterystyk}
+\begin{frame}{Niezmienniki Riemanna: Wyprowadzenie}
+Różniczki zmiennych charakterystycznych definiujemy poprzez lewe wektory własne macierzy jakobianu:
+$$ \partial W = L\,\partial U \quad \implies \quad \partial W_{1,2} = \partial u \pm \frac{c}{A} \partial A $$
+
+Całkujemy powyższe relacje, wykorzystując zależność prędkości propagacji fali $c(A) \propto A^{1/4}$:
+$$ \int \frac{c(A)}{A} dA = 4c $$
+
+\begin{block}{Niezmienniki Riemanna}
+$$ W_1 = u + 4c $$
+$$ W_2 = u - 4c $$
+\end{block}
+\end{frame}
+\begin{frame}{Układ w zmiennych charakterystycznych}
+Przejście z przestrzeni zmiennych zachowawczych $U$ do zmiennych charakterystycznych $W$:
+$$ \partial_t W + \Lambda \partial_z W = 0 $$
+gdzie $\Lambda = \text{diag}(\lambda_1, \lambda_2)$ to diagonalna macierz wartości własnych.
+
+Układ rozpada się na dwa niesprzężone równania adwekcji (dla przepływu nielepkiego):
+\begin{block}{Układ charakterystyczny}
+$$ \partial_t W_1 + (u+c) \partial_z W_1 = 0 \quad \text{(fala w przód)} $$
+$$ \partial_t W_2 + (u-c) \partial_z W_2 = 0 \quad \text{(fala w tył)} $$
+\end{block}
+\end{frame}
+\begin{frame}{Inwersja do zmiennych fizycznych}
+Odtworzenie fizycznych parametrów przepływu wymaga mapowania odwrotnego $W \mapsto U$.
+
+Rozwiązujemy układ równań liniowych ze względu na $u$ oraz $c$:
+$$ \begin{bmatrix} 1 & 4 \\ 1 & -4 \end{bmatrix} \begin{bmatrix} u \\ c \end{bmatrix} = \begin{bmatrix} W_1 \\ W_2 \end{bmatrix} $$
+
+\begin{block}{Zmienne fizyczne}
+$$ u = \frac{W_1 + W_2}{2}, \qquad c = \frac{W_1 - W_2}{8} $$
+$$ A = \left( \frac{2\rho}{\beta} c^2 \right)^2 $$
+\end{block}
+\end{frame}
+\begin{frame}{Ekstrapolacja na warunkach brzegowych}
+Na brzegach domeny (wlot/wylot) tracimy informację z jednej z charakterystyk. Brakującą wartość przybliżamy na podstawie węzłów wewnętrznych.
+Stosujemy ekstrapolację liniową (pierwszego rzędu dokładności):
+\begin{block}{Ogólna formuła ekstrapolacji}
+$$ W_{b} = 2W_{1} - W_{2} $$
+\end{block}
+Gdzie:
+\begin{itemize}
+\item $W_{b}$ -- poszukiwana wartość na brzegu domeny
+\item $W_{1}, W_{2}$ -- wartości w pierwszym i drugim węźle wewnętrznym naczynia
+\end{itemize}
+\end{frame}
+
+
+\section{Warunki brzegowe i niezmienniki Riemanna}
+
+\begin{frame}{Metoda charakterystyk na brzegach}
+    Rozwiązywanie układu równań na brzegach domeny (wlot/wylot) opiera się na analizie propagacji fal i \textbf{niezmiennikach Riemanna} ($W_1$, $W_2$).
+    
+    \vspace{0.3cm}
+    Dla układu poddźwiękowego (typowego dla krwi):
+    \begin{itemize}
+        \item Fale propagują się w dwóch kierunkach ze zmienną prędkością $c$ (celerity).
+        \item $W_1 = u + 4c$ przemieszcza się zgodnie z kierunkiem przepływu (w prawo).
+        \item $W_2 = u - 4c$ przemieszcza się przeciwnie do kierunku przepływu (w lewo).
+    \end{itemize}
+    \vspace{0.3cm}
+    \textbf{Zasada ogólna:} Charakterystykę "wychodzącą" z domeny ekstrapolujemy z punktów wewnętrznych naczynia, a "wchodzącą" wyznaczamy z zadanego warunku brzegowego.
+\end{frame}
+
+\begin{frame}{Warunek wlotowy (Inlet)}
+    Na wlocie ($z=0$) najczęściej zadajemy fizyczną wartość przepływu $Q_{in}(t)$ (np. z wyrzutu lewej komory serca).
+    
+    \vspace{0.2cm}
+    \textbf{Krok 1:} Liniowa ekstrapolacja wychodzącej charakterystyki $W_2$ z poprzedniego kroku czasowego:
+    $$W_2^{n+1}\big|_{z=0} = W_2^n\big|_{z=0} + \Delta t \left( \frac{W_2^n\big|_{z=\Delta z} - W_2^n\big|_{z=0}}{\Delta z} \right) (-\lambda_2\big|_{z=0})$$
+    
+    \textbf{Krok 2:} Obliczenie wchodzącej charakterystyki $W_1$ na podstawie zadanego przepływu $Q_{in}$ i zaktualizowanego $W_2$:
+    $$W_1^{n+1}\big|_{z=0} = -W_2^{n+1}\big|_{z=0} + 2\frac{Q_{in}}{A^n}$$
+    
+    Następnie wyznaczamy nowe wartości fizyczne $(A, Q)$ korzystając z relacji odwrotnych.
+\end{frame}
+
+\begin{frame}{Warunek wylotowy: Odbijający / Nieodbijający}
+    Na wylocie ($z=L$) możemy zastosować prosty model wykorzystujący \textbf{współczynnik odbicia} $R_t \in [-1, 1]$.
+    
+    \vspace{0.2cm}
+    Najpierw ekstrapolujemy wychodzącą falę $W_1^{n+1}\big|_{z=L}$ z wnętrza domeny. Następnie modyfikujemy falę wracającą $W_2$:
+    $$W_2^{n+1}\big|_{z=L} = W_2^0\big|_{z=L} - R_t \left( W_1^{n+1}\big|_{z=L} - W_1^0\big|_{z=L} \right)$$
+    
+    \begin{block}{Wpływ współczynnika $R_t$}
+        \begin{itemize}
+            \item \textbf{$R_t = 0$}: Warunek \textit{nieodbijający} (non-reflective). Fala opuszcza domenę bez generowania echa. Idealne dla swobodnego odpływu.
+            \item \textbf{$R_t = 1$}: Pełne odbicie. Fala odbita całkowicie znosi falę wychodzącą.
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+
+\begin{frame}{Warunek wylotowy: Model Windkessel (3-elementowy)}
+    \begin{columns}
+        \begin{column}{0.55\textwidth}
+            Aby wiernie modelować wpływ mikrokrążenia (którego nie opłaca się symulować w 1D), stosuje się modele o parametrach skupionych (0D), analogiczne do obwodów elektrycznych.
+            \vspace{0.2cm}
+            \begin{itemize}
+                \item \textbf{$R_1$} -- opór charakterystyczny naczynia proksymalnego (redukuje sztuczne odbicia).
+                \item \textbf{$C$} -- podatność (pojemność) naczyń obwodowych (zdolność do magazynowania krwi).
+                \item \textbf{$R_2$} -- całkowity opór obwodowy.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.45\textwidth}
+            \begin{figure}
+                \centering
+                \begin{circuitikz}[scale=0.8, transform shape, thick]
+                    % Wlot
+                    \draw (0,0) to[R, l=$R_1$] (2.5,0);
+                    % Rozgałęzienie górne (R2)
+                    \draw (2.5,0) -- (2.5,1.2) to[R, l=$R_2$] (5.5,1.2) -- (5.5,0);
+                    % Rozgałęzienie dolne (C)
+                    \draw (2.5,0) -- (2.5,-1.2) to[C, l=$C$] (5.5,-1.2) -- (5.5,0);
+                    % Wylot do uziemienia
+                    \draw (5.5,0) -- (6.5,0) node[right] {$P_{out}$};
+                    % Punkt początkowy
+                    \draw (0,0) node[left] {$P_{in}$};
+                \end{circuitikz}
+                \vspace{0.3cm}
+                \caption{\tiny Schemat 3-elementowego modelu Windkessel wygenerowany w TikZ.}
+            \end{figure}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Windkessel: Równania sprzęgające}
+    Połączenie domeny 1D z modelem 0D wymaga rozwiązania problemu Riemanna na granicy obu modeli, szukając stanu pośredniego $(A^*, u^*)$.
+    
+    \vspace{0.3cm}
+    Dynamikę ciśnienia na kondensatorze $P_C$ opisuje równanie różniczkowe:
+    $$C\frac{dP_C}{dt} + \frac{P_C - P_{out}}{R_2} - A^*u^* = 0$$
+    
+    Z kolei zależność strumienia od oporu $R_1$ wynosi:
+    $$A^*u^* = \frac{P(A^*) - P_C}{R_1}$$
+    
+    Rozwiązanie tego układu pozwala dopasować przepływ wylotowy z modelu 1D do oporów i elastyczności obwodu mikrokrążenia.
+\end{frame}
+
+\begin{frame}{Implementacja modelu Windkessel (Kroki)}
+    W praktyce obliczeniowej model ten rozwiązuje się iteracyjnie w każdym kroku czasowym:
+    
+    \begin{enumerate}
+        \item \textbf{Dyskretyzacja w czasie:} Przybliżamy równanie kondensatora wstecznie, obliczając nowe ciśnienie $P_C^n$ na podstawie wartości $(A^*, u^*)$ z poprzedniego kroku.
+        \item \textbf{Równanie nieliniowe:} Zastępując $u^*$ przez rozwinięcie z niezmienników Riemanna, uzyskujemy nieliniowe równanie jednej zmiennej $\mathcal{F}(A^*) = 0$.
+        \item \textbf{Rozwiązanie sprzężenia:} Używamy metody Newtona (lub wbudowanych solverów) do znalezienia pola przekroju $A^*$ dla którego funkcja wynosi zero.
+        \item \textbf{Aktualizacja:} Mając $A^*$, wyliczamy nowe $u^*$ i narzucamy je jako warunek brzegowy zamykający domenę 1D ($A^{n+1}_R$, $u^{n+1}_R$).
+    \end{enumerate}
+\end{frame}
+
+\section{Warunki w węzłach naczyniowych}
+
+% --- SLAJD 1: Typy połączeń ---
+\begin{frame}{Węzeł jako punkt styku subdomen}
+    Wyprowadzone wcześniej równania opisują ruch wewnątrz naczynia. Węzły łączą te subdomeny, narzucając ciągłość przepływu w punktach krytycznych:
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item \textbf{Złącze proste (Conjunction):} Przejście między naczyniami o różnej sztywności ($\beta$) lub przekroju spoczynkowym ($A_0$).
+        \item \textbf{Bifurkacja:} Rozdzielenie energii tętna na mniejsze odgałęzienia (np. aorta brzuszna).
+        \item \textbf{Zespolenie (Anastomosis):} Ponowne połączenie strumieni (np. Koło tętnicze Willisa).
+    \end{itemize}
+\end{frame}
+
+% --- SLAJD 2: Pojedyncze połączenie (Niewiadome) ---
+\begin{frame}{Pojedyncze połączenie: Bilans niewiadomych}
+    Rozważamy punkt styku naczynia lewego ($L$) i prawego ($R$). 
+    \vspace{0.4cm}
+    Szukamy stanu granicznego opisanego przez \textbf{4 niewiadome}:
+    \begin{itemize}
+        \item $A_L, u_L$ -- parametry na końcu naczynia lewego.
+        \item $A_R, u_R$ -- parametry na początku naczynia prawego.
+    \end{itemize}
+    \vspace{0.3cm}
+    Aby układ był domknięty, musimy wyznaczyć \textbf{4 niezależne równania}.
+\end{frame}
+
+% --- SLAJD 3: Fizyka węzła ---
+\begin{frame}{Fizyka węzła: Masa i Energia}
+    Dwa równania wynikają z fundamentalnych praw zachowania (analogicznie do postaci zachowawczej z Sekcji 1):
+    \vspace{0.3cm}
+    \begin{block}{1. Zachowanie masy (Ciągłość)}
+        \[ Q_L = Q_R \implies A_L u_L = A_R u_R \]
+    \end{block}
+    \begin{block}{2. Ciągłość ciśnienia całkowitego (Bernoulli)}
+        \[ P(A_L) + \frac{1}{2}\rho u_L^2 = P(A_R) + \frac{1}{2}\rho u_R^2 \]
+    \end{block}
+    \centering \footnotesize \textit{Uwaga: Ciśnienie $P(A)$ obliczane jest zgodnie z przedstawionym wcześniej prawem rury.}
+\end{frame}
+
+% --- SLAJD 4: Sprzężenie z charakterystykami ---
+\begin{frame}{Domknięcie: Wykorzystanie niezmienników Riemanna}
+    Brakujące dwa równania pochodzą z wnętrza naczyń. Wykorzystujemy fakt, że niezmienniki $W_{1,2}$ przenoszą informację wzdłuż charakterystyk:
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item \textbf{Z naczynia L (w przód):} Węzeł "odbiera" wartość $W_1^{ext}$ wyekstrapolowaną z poprzednich węzłów naczynia lewego.
+        \item \textbf{Z naczynia R (w tył):} Węzeł "odbiera" wartość $W_2^{ext}$ wyekstrapolowaną z naczynia prawego.
+    \end{itemize}
+    \[ u_L + 4c(A_L) = W_1^{ext} \]
+    \[ u_R - 4c(A_R) = W_2^{ext} \]
+\end{frame}
+
+% --- SLAJD 5: Topologia węzłów ---
+\begin{frame}{Topologia: Przepływ masy vs Informacji}
+    Węzeł musi balansować informację fizyczną (przepływ) z matematyczną (niezmienniki).
+    
+    \vspace{0.5cm} 
+    
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.85\linewidth]{przeplyw_informacji.png}
+        \caption{\tiny Schemat napływu charakterystyk do węzła. Bifurkacja wymaga sprzężenia aż 6 równań jednocześnie.}
+    \end{figure}
+\end{frame}
+
+% --- SLAJD 6: Bifurkacja (Równania) ---
+\begin{frame}{Bifurkacja: Skalowanie problemu}
+    Dla rozgałęzienia szukamy wektora $\mathbf{x} = [A_p, u_p, A_{d1}, u_{d1}, A_{d2}, u_{d2}]^T$. 
+    \vspace{0.2cm}
+    Układ \textbf{6 równań nieliniowych}:
+    \begin{block}{Równania zachowania (3)}
+        $Q_p = Q_{d1} + Q_{d2}$ \\
+        $P_p + \text{dyn}_p = P_{d1} + \text{dyn}_{d1}$ \\
+        $P_p + \text{dyn}_p = P_{d2} + \text{dyn}_{d2}$
+    \end{block}
+    \begin{block}{Równania charakterystyk (3)}
+        Stałość niezmienników napływających: $W_{1,p}^{ext}$, $W_{2,d1}^{ext}$, $W_{2,d2}^{ext}$.
+    \end{block}
+\end{frame}
+
+% --- SLAJD 7: Wyzwania numeryczne ---
+\begin{frame}{Dlaczego węzeł jest "wąskim gardłem" obliczeń?}
+    W przeciwieństwie do wnętrza naczynia, gdzie stosujemy proste schematy jawne, węzeł wymaga rozwiązania problemu algebraicznego w każdym kroku czasowym.
+    \vspace{0.3cm}
+    \textbf{Źródła nieliniowości:}
+    \begin{itemize}
+        \item \textbf{Adwekcja:} Kwadratowy wyraz prędkości ($u^2$) w ciśnieniu całkowitym.
+        \item \textbf{Geometria:} Zależność prędkości fali $c$ od przekroju $A$ ($c \propto A^{1/4}$), co sprawia, że niezmienniki Riemanna są nieliniowe względem pola przekroju.
+    \end{itemize}
+\end{frame}
+
+% --- SLAJD 8: Metoda Newtona-Raphsona ---
+\begin{frame}{Rozwiązanie: Wielowymiarowa metoda Newtona}
+    Definiujemy funkcję błędu (resztę) $\mathbf{F}(\mathbf{x}) = 0$. Szukamy rozwiązania iteracyjnie:
+    \vspace{0.3cm}
+    \begin{enumerate}
+        \item Wyznaczamy macierz Jakobianu $\mathbf{J} = \frac{\partial \mathbf{F}}{\partial \mathbf{x}}$ (układ 6x6).
+        \item Rozwiązujemy układ liniowy dla poprawki $\Delta \mathbf{x}$:
+        \[ \mathbf{J} \Delta \mathbf{x} = -\mathbf{F}(\mathbf{x}^{(k)}) \]
+        \item Aktualizujemy stan: $\mathbf{x}^{(k+1)} = \mathbf{x}^{(k)} + \Delta \mathbf{x}$.
+    \end{enumerate}
+    \vspace{0.2cm}
+    Węzeł staje się punktem sprzężenia, który "wymusza" spójność na całej sieci.
+\end{frame}
+
+% --- SLAJD 9: Zbieżność i Warm Start ---
+\begin{frame}{Efektywność: Warm Start}
+    Dzięki wysokiej częstotliwości próbkowania czasowego, stan węzła w chwili $t_n$ jest bardzo bliski stanu w $t_{n+1}$.
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item Jako \textbf{punkt startowy} Newtona przyjmujemy wynik z poprzedniego kroku.
+        \item Zapewnia to start w "obszarze zbieżności" pierwiastka.
+        \item Rezultat: Osiągnięcie precyzji maszynowej w rekordowym tempie.
+    \end{itemize}
+\end{frame}
+
+% --- SLAJD 10: Zbieżność w praktyce ---
+\begin{frame}{Wizualizacja zbieżności}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.6\textheight]{zbieznosc_newton.png}
+        \caption{\tiny Logarytmiczny spadek błędu resztkowego. Newton wykazuje zbieżność kwadratową – błąd maleje drastycznie po 2. iteracji.}
+    \end{figure}
+    
+    \centering
+    \begin{block}{}
+        \centering
+        Średni czas rozwiązania węzła: \textbf{3--4 iteracje}.
+    \end{block}
+\end{frame}
+
+% --- LITERATURA ---
+\begin{frame}{Literatura}
+    \nocite{*}
+    \bibliographystyle{unsrt}
+    \bibliography{zrodla}
+    \vspace{1em}
+    \centering
+\end{frame}
+
+\begin{frame}[standout]
+    Dziękujemy za uwagę!
+\end{frame}
+
+
+\end{document}
