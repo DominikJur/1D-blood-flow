@@ -1,0 +1,126 @@
+nohup: zignorowane dane wejściowe
+Using backend: pytorch
+Other supported backends: tensorflow.compat.v1, tensorflow, jax, paddle.
+paddle supports more examples now and is recommended.
+Set the default float type to float64
+Wczytywanie blood_flow_data.csv...
+  Łącznie 1215162 punktów danych
+  Po subsamplingu (co 50): 24304 punktów
+
+Krok 1: Pre-trening na danych (supervised)
+Compiling model...
+'compile' took 0.416163 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+0         [4.77e-02]    [1.25e-01]    []  
+1000      [5.94e-03]    [4.57e-02]    []  
+2000      [5.90e-03]    [4.48e-02]    []  
+3000      [5.83e-03]    [4.29e-02]    []  
+4000      [1.24e-03]    [3.36e-03]    []  
+5000      [9.63e-04]    [8.88e-04]    []  
+6000      [6.47e-04]    [5.29e-04]    []  
+7000      [8.10e-05]    [2.69e-04]    []  
+8000      [1.23e-04]    [5.83e-04]    []  
+9000      [3.77e-05]    [1.80e-04]    []  
+10000     [4.23e-05]    [2.65e-04]    []  
+11000     [3.51e-05]    [2.26e-04]    []  
+12000     [3.18e-05]    [2.08e-04]    []  
+13000     [2.95e-05]    [1.95e-04]    []  
+14000     [3.08e-05]    [2.00e-04]    []  
+15000     [2.62e-05]    [1.73e-04]    []  
+
+Best model at step 15000:
+  train loss: 2.62e-05
+  test loss: 1.73e-04
+  test metric: []
+
+'train' took 427.512336 s
+
+Compiling model...
+'compile' took 0.000086 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+15000     [2.62e-05]    [1.73e-04]    []  
+16000     [1.40e-05]    [1.12e-04]    []  
+17000     [7.66e-06]    [5.04e-05]    []  
+18000     [5.04e-06]    [3.06e-05]    []  
+19000     [3.55e-06]    [1.90e-05]    []  
+20000     [2.73e-06]    [1.30e-05]    []  
+21000     [2.07e-06]    [9.44e-06]    []  
+22000     [1.45e-06]    [7.50e-06]    []  
+22953     [1.26e-06]    [7.04e-06]    []  
+23786     [1.26e-06]    [7.03e-06]    []  
+24619     [1.25e-06]    [7.02e-06]    []  
+25452     [1.25e-06]    [7.02e-06]    []  
+26285     [1.25e-06]    [7.01e-06]    []  
+27118     [1.25e-06]    [7.00e-06]    []  
+27951     [1.25e-06]    [7.00e-06]    []  
+28784     [1.25e-06]    [6.99e-06]    []  
+29617     [1.24e-06]    [6.99e-06]    []  
+30450     [1.24e-06]    [6.99e-06]    []  
+
+Best model at step 30450:
+  train loss: 1.24e-06
+  test loss: 6.99e-06
+  test metric: []
+
+'train' took 646.429321 s
+
+[0m[33m2026-05-19 16:15:41.233 (4823.630s) [    7FA7636FE780]vtkXOpenGLRenderWindow.:1460  WARN| bad X server connection. DISPLAY=[0m
+
+Krok 2: Fine-tuning z PDE + dane + BC
+Używane urządzenie do fine-tuningu: cuda
+  Training for 20000 iterations...
+  iter   1000/20000: total=2.8711e-02, data=1.0383e-03, pde=2.4067e-02, bc=3.6059e-03
+  iter   2000/20000: total=1.7405e-02, data=8.4525e-04, pde=1.3543e-02, bc=3.0169e-03
+  iter   3000/20000: total=1.3482e-02, data=7.0496e-04, pde=1.0295e-02, bc=2.4818e-03
+  iter   4000/20000: total=1.0830e-02, data=6.1963e-04, pde=8.0975e-03, bc=2.1128e-03
+  iter   5000/20000: total=9.7203e-03, data=5.5336e-04, pde=7.2988e-03, bc=1.8681e-03
+  iter   6000/20000: total=8.8445e-03, data=5.2973e-04, pde=6.6292e-03, bc=1.6855e-03
+  iter   7000/20000: total=8.6592e-03, data=4.7247e-04, pde=6.6653e-03, bc=1.5215e-03
+  iter   8000/20000: total=7.3790e-03, data=4.3285e-04, pde=5.5985e-03, bc=1.3477e-03
+  iter   9000/20000: total=7.3350e-03, data=4.0627e-04, pde=5.7162e-03, bc=1.2125e-03
+  iter  10000/20000: total=5.6871e-03, data=3.5886e-04, pde=4.2647e-03, bc=1.0635e-03
+  iter  11000/20000: total=9.6603e-03, data=3.3512e-04, pde=8.3088e-03, bc=1.0164e-03
+  iter  12000/20000: total=6.2284e-03, data=3.1207e-04, pde=5.0243e-03, bc=8.9206e-04
+  iter  13000/20000: total=7.2695e-03, data=2.9496e-04, pde=6.1265e-03, bc=8.4805e-04
+  iter  14000/20000: total=5.2886e-03, data=2.6628e-04, pde=4.2387e-03, bc=7.8361e-04
+  iter  15000/20000: total=5.2139e-03, data=2.5586e-04, pde=4.2274e-03, bc=7.3065e-04
+  iter  16000/20000: total=4.5814e-03, data=2.3734e-04, pde=3.6585e-03, bc=6.8547e-04
+  iter  17000/20000: total=6.1916e-03, data=2.2423e-04, pde=5.3045e-03, bc=6.6288e-04
+  iter  18000/20000: total=6.4639e-03, data=2.2486e-04, pde=5.5846e-03, bc=6.5442e-04
+  iter  19000/20000: total=4.6712e-03, data=2.1031e-04, pde=3.8630e-03, bc=5.9787e-04
+  iter  20000/20000: total=6.1134e-03, data=2.0820e-04, pde=5.3122e-03, bc=5.9297e-04
+
+  L-BFGS fine-tuning...
+
+Krok 4: Końcowa ocena
+Ewaluacja przeprowadzana na urządzeniu: cuda:0...
+Ewaluacja na danych treningowych...
+  Normalizowany błąd A: mean=0.0009, max=0.0186
+  Normalizowany błąd Q: mean=0.0030, max=0.0763
+
+Ewaluacja warunków brzegowych...
+  Inlet BC Q: mean_err=9.5369e-08, max_err=1.7101e-06
+  Outlet BC d1 W2: mean_err=2.0695e-03, max_err=9.5713e-03
+  Outlet BC d2 W2: mean_err=1.2563e-03, max_err=5.7376e-03
+  Junction mass conservation: mean_err=6.0037e-08, max_err=1.0960e-06
+
+Model zapisany jako pinn_blood_flow_model.pth
+
+Generowanie predykcji na siatce...
+  Predykcja: 25/100
+  Predykcja: 50/100
+  Predykcja: 75/100
+  Predykcja: 100/100
+Zapisano pinn_prediction.csv
+Globalne max Q (PINN): 50.82 ml/s
+Eksportowanie animacji do GIF (PINN)...
+  Cykl 1/1 (100 klatek)
+Zapisano pinn_prediction.gif (100 klatek, 1 cykli)
+
+Gotowe!

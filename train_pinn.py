@@ -9,14 +9,41 @@ Boundary conditions based on:
   A Comprehensive Yet Concise Review" (2025) - sekcje 6, 7
 """
 
+"""
+USE COMMAND:
+nohup uv run train_pinn.py > log.log 2>&1 & disown   
+"""
+
 import numpy as np
 import pandas as pd
 import deepxde as dde
 import torch
 import os
+import argparse
+import pyvista as pv
 
 dde.config.set_default_float("float64")
 torch.set_default_dtype(torch.float64)
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Train or evaluate the PINN for 1D blood flow."
+    )
+    parser.add_argument(
+        "--train",
+        action="store_true",
+        help="Train the model instead of loading existing weights."
+    )
+    parser.add_argument(
+        "--model-path",
+        default="pinn_blood_flow_model.pth",
+        help="Path to the model state_dict."
+    )
+    return parser.parse_args()
+
+args = parse_args()
+TRAIN = args.train
+MODEL_PATH = args.model_path
 
 # ============================================================
 # STAŁE FIZYCZNE (muszą być zgodne z solver.py)
@@ -34,21 +61,21 @@ A0_p = np.pi * r_p**2
 A0_d1 = np.pi * r_d1**2
 A0_d2 = np.pi * r_d2**2
 
-beta_p = rho * c0**2 / A0_p
-beta_d1 = rho * c0**2 / A0_d1
-beta_d2 = rho * c0**2 / A0_d2
+beta_p = 2.0 * rho * c0**2 / np.sqrt(A0_p)
+beta_d1 = 2.0 * rho * c0**2 / np.sqrt(A0_d1)
+beta_d2 = 2.0 * rho * c0**2 / np.sqrt(A0_d2)
 
 T_out = 0.75
 
-# Stałe dla warunków brzegowych
-c0_p = np.sqrt(beta_p * A0_p / rho)
-c0_d1 = np.sqrt(beta_d1 * A0_d1 / rho)
-c0_d2 = np.sqrt(beta_d2 * A0_d2 / rho)
+# Stałe dla warunków brzegowych (spójne z solver.py)
+c0_p = np.sqrt(beta_p / (2.0 * rho)) * np.power(A0_p, 0.25)
+c0_d1 = np.sqrt(beta_d1 / (2.0 * rho)) * np.power(A0_d1, 0.25)
+c0_d2 = np.sqrt(beta_d2 / (2.0 * rho)) * np.power(A0_d2, 0.25)
 
-# W2_0 = u_0 - 2*c0, u_0 = 0 (spoczynek)
-W2_0_p = -2.0 * c0_p
-W2_0_d1 = -2.0 * c0_d1
-W2_0_d2 = -2.0 * c0_d2
+# Inwarianty Riemanna dla tego prawa tuby to u +/- 4c (nie 2c)
+W2_0_p = -4.0 * c0_p
+W2_0_d1 = -4.0 * c0_d1
+W2_0_d2 = -4.0 * c0_d2
 
 T_pulse = 0.02  # szerokość impulsu w Q_in(t)
 Q_peak = 5e-5
@@ -57,47 +84,51 @@ Q_peak = 5e-5
 T_scale = T_out
 A_scale = max(A0_p, A0_d1, A0_d2)
 Q_scale = Q_peak
+P_scale = rho * c0**2  # Skala ciśnienia do normalizacji strat BC
 
 # ============================================================
-# FUNKCJE POMOCNICZE
+# FUNKCJE POMOCNICZE (zgodne z solver.py)
+# Zabezpieczone przed wartościami ujemnymi/zerowymi w celu uniknięcia NaN w autograd
 # ============================================================
+def safe_sqrt(x, eps=1e-12):
+    """Zabezpieczony pierwiastek kwadratowy zapobiegający zerowym i ujemnym gradientom."""
+    return torch.sqrt(torch.clamp(x, min=eps))
+
+def safe_pow_025(x, eps=1e-12):
+    """Zabezpieczone potęgowanie do 0.25 (A^(1/4)) zapobiegające NaN."""
+    return torch.pow(torch.clamp(x, min=eps), 0.25)
+
 def pressure(A, A0, beta):
-    """P = beta*(A - A0)"""
+    """P = beta*(sqrt(A) - sqrt(A0))"""
     beta_t = torch.as_tensor(beta, dtype=A.dtype, device=A.device)
     A0_t = torch.as_tensor(A0, dtype=A.dtype, device=A.device)
-    return beta_t * (A - A0_t)
+    return beta_t * (safe_sqrt(A) - np.sqrt(A0))
 
 def wave_speed(A, A0, beta):
-    """c = sqrt(beta * A / rho)"""
+    """c = sqrt(beta / 2*rho) * A^(1/4)"""
     beta_t = torch.as_tensor(beta, dtype=A.dtype, device=A.device)
     rho_t = torch.as_tensor(rho, dtype=A.dtype, device=A.device)
-    return torch.sqrt(beta_t * A / rho_t)
+    return torch.sqrt(beta_t / (2.0 * rho_t)) * safe_pow_025(A)
 
 def total_pressure(A, Q, A0, beta):
     """P_tot = P + 0.5*rho*(Q/A)^2"""
     rho_t = torch.as_tensor(rho, dtype=A.dtype, device=A.device)
-    return pressure(A, A0, beta) + 0.5 * rho_t * (Q / torch.clamp(A, min=1e-12))**2
+    A_clamped = torch.clamp(A, min=1e-10)
+    return pressure(A, A0, beta) + 0.5 * rho_t * (Q / A_clamped)**2
 
 def riemann_W1(A, Q, A0, beta):
-    """W1 = u + 2*c"""
-    u = Q / torch.clamp(A, min=1e-12)
+    """W1 = u + 4*c (zgodnie z publikacją)"""
+    A_clamped = torch.clamp(A, min=1e-10)
+    u = Q / A_clamped
     c = wave_speed(A, A0, beta)
-    return u + 2.0 * c
+    return u + 4.0 * c
 
 def riemann_W2(A, Q, A0, beta):
-    """W2 = u - 2*c"""
-    u = Q / torch.clamp(A, min=1e-12)
+    """W2 = u - 4*c (zgodnie z publikacją)"""
+    A_clamped = torch.clamp(A, min=1e-10)
+    u = Q / A_clamped
     c = wave_speed(A, A0, beta)
-    return u - 2.0 * c
-
-def Q_in_waveform(t):
-    """Przebieg Q_in(t) zgodny z solver.py"""
-    out = torch.zeros_like(t)
-    mask1 = (t <= T_pulse)
-    mask2 = (t >= 0.1) & (t <= 0.1 + T_pulse)
-    out = out + mask1 * (Q_peak * torch.sin(np.pi * t / T_pulse))
-    out = out + mask2 * (Q_peak * torch.sin(np.pi * (t - 0.1) / T_pulse))
-    return out
+    return u - 4.0 * c
 
 def denorm_output(y_hat):
     """Zwraca (A, Q) w jednostkach fizycznych."""
@@ -160,13 +191,12 @@ t_bc = np.linspace(0, T_out, N_bc_time).astype(np.float64)
 t_bc_norm = t_bc / T_scale
 
 # --- 1. Inlet BC: parent, z=0 ---
-# Q(t, z=0, vessel=parent) = Q_in(t)
 X_inlet = np.column_stack([
     t_bc_norm,
-    np.zeros(N_bc_time, dtype=np.float64),        # z = 0 (z_norm)
+    np.zeros(N_bc_time, dtype=np.float64),         # z = 0
     np.ones(N_bc_time, dtype=np.float64) * 1.0,    # onehot[0] = 1
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[1] = 0
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[2] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # onehot[1] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # onehot[2] = 0
 ])
 Q_inlet_target = np.zeros((N_bc_time, 1), dtype=np.float64)
 for i in range(N_bc_time):
@@ -182,89 +212,45 @@ for i in range(N_bc_time):
 X_outlet_d1 = np.column_stack([
     t_bc_norm,
     np.ones(N_bc_time, dtype=np.float64),          # z = 1
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[0] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # onehot[0] = 0
     np.ones(N_bc_time, dtype=np.float64) * 1.0,    # onehot[1] = 1
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[2] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # onehot[2] = 0
 ])
 
 # --- 3. Non-reflective outlet BC: daughter2, z=1 ---
 X_outlet_d2 = np.column_stack([
     t_bc_norm,
     np.ones(N_bc_time, dtype=np.float64),          # z = 1
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[0] = 0
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[1] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # onehot[0] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # onehot[1] = 0
     np.ones(N_bc_time, dtype=np.float64) * 1.0,    # onehot[2] = 1
 ])
 
 # --- 4. Bifurcation junction ---
-# Punkty po stronie parent (z=1) i daughter (z=0) w tych samych chwilach
-# Dla każdego t, potrzebujemy parent(z=1), d1(z=0), d2(z=0)
 X_junction_p = np.column_stack([
     t_bc_norm,
     np.ones(N_bc_time, dtype=np.float64),          # z = 1
-    np.ones(N_bc_time, dtype=np.float64) * 1.0,    # onehot[0] = 1
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[1] = 0
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[2] = 0
+    np.ones(N_bc_time, dtype=np.float64) * 1.0,
+    np.zeros(N_bc_time, dtype=np.float64),
+    np.zeros(N_bc_time, dtype=np.float64),
 ])
 X_junction_d1 = np.column_stack([
     t_bc_norm,
-    np.zeros(N_bc_time, dtype=np.float64),          # z = 0
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[0] = 0
-    np.ones(N_bc_time, dtype=np.float64) * 1.0,    # onehot[1] = 1
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[2] = 0
+    np.zeros(N_bc_time, dtype=np.float64),         # z = 0
+    np.zeros(N_bc_time, dtype=np.float64),
+    np.ones(N_bc_time, dtype=np.float64) * 1.0,
+    np.zeros(N_bc_time, dtype=np.float64),
 ])
 X_junction_d2 = np.column_stack([
     t_bc_norm,
-    np.zeros(N_bc_time, dtype=np.float64),          # z = 0
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[0] = 0
-    np.zeros(N_bc_time, dtype=np.float64),          # onehot[1] = 0
-    np.ones(N_bc_time, dtype=np.float64) * 1.0,    # onehot[2] = 1
+    np.zeros(N_bc_time, dtype=np.float64),         # z = 0
+    np.zeros(N_bc_time, dtype=np.float64),
+    np.zeros(N_bc_time, dtype=np.float64),
+    np.ones(N_bc_time, dtype=np.float64) * 1.0,
 ])
 
 # ============================================================
-# GEOMETRIA + PDE
-# ============================================================
-geom = dde.geometry.Hypercube([0, 0, 0, 0, 0],
-                               [1.0, 1.0, 1, 1, 1])
-
-
-def pde_fn(x, y):
-    """
-    x: (t, z_norm, onehot_0, onehot_1, onehot_2)
-    y: (A_hat, Q_hat)
-    """
-    A_hat, Q_hat = y[:, 0:1], y[:, 1:2]
-    A = A_hat * A_scale
-    Q = Q_hat * Q_scale
-
-    A_hat_t = dde.grad.jacobian(y, x, i=0, j=0)
-    Q_hat_t = dde.grad.jacobian(y, x, i=1, j=0)
-    A_hat_z = dde.grad.jacobian(y, x, i=0, j=1)
-    Q_hat_z = dde.grad.jacobian(y, x, i=1, j=1)
-
-    onehot = x[:, 2:5]
-    beta = (beta_p * onehot[:, 0:1] + beta_d1 * onehot[:, 1:2] + beta_d2 * onehot[:, 2:3]).detach()
-    L = (L_p * onehot[:, 0:1] + L_d1 * onehot[:, 1:2] + L_d2 * onehot[:, 2:3]).detach()
-
-    A_t = (A_scale / T_scale) * A_hat_t
-    Q_t = (Q_scale / T_scale) * Q_hat_t
-    A_z = (A_scale / L) * A_hat_z
-    Q_z = (Q_scale / L) * Q_hat_z
-
-    # Continuity: dA/dt + dQ/dz = 0 (pochodne w jednostkach fizycznych)
-    F_A = A_t + Q_z
-
-    # Momentum: dQ/dt + d(Q²/A)/dz + A/rho * dP/dz + KR*Q/A = 0
-    dF2_dz = (2.0 * Q / A * Q_z - Q**2 / A**2 * A_z)
-    dP_dz = beta * A_z
-    viscous = KR * Q / A
-
-    F_Q = Q_t + dF2_dz + A / rho * dP_dz + viscous
-    return [F_A, F_Q]
-
-
-# ============================================================
-# SIEC
+# SIEC I MODEL
 # ============================================================
 net = dde.nn.FNN(
     layer_sizes=[5, 128, 128, 128, 128, 2],
@@ -272,151 +258,145 @@ net = dde.nn.FNN(
     kernel_initializer="Glorot normal"
 )
 
-# ============================================================
-# MODEL: PDE bez BC (do pre-treningu)
-# ============================================================
-data = dde.data.PDE(
-    geom,
-    pde_fn,
-    [],              # brak BC - dodamy je ręcznie
-    num_domain=10000,
-    num_boundary=0,
-    solution=None,
-    num_test=2000
-)
+def output_transform(x, y):
+    A_hat = torch.nn.functional.softplus(y[:, 0:1]) + 1e-4
+    Q_hat = y[:, 1:2]
+    return torch.cat([A_hat, Q_hat], dim=1)
 
-model = dde.Model(data, net)
+net.apply_output_transform(output_transform)
 
-# ============================================================
-# TRENING WŁASNY Z DANYMI + BC
-# ============================================================
-print("\nKrok 1: Pre-trening na danych (supervised)")
-print(f"  Wejścia: t, z_norm, onehot[3] -> 5")
-print(f"  Wyjścia: A, Q -> 2")
-print(f"  Punkty: {n_train}")
-print()
-
-# Użyjemy DataSet dla supervised pretrain
-data_supervised = dde.data.DataSet(
-    X_train=X_obs, y_train=y_obs,
-    X_test=X_obs[:1000], y_test=y_obs[:1000],
-    standardize=False
-)
-
-model_sup = dde.Model(data_supervised, net)
-
-# Adam na danych
-model_sup.compile("adam", lr=1e-3, loss="MSE")
-losshistory, train_state = model_sup.train(iterations=15000, display_every=1000)
-
-# L-BFGS na danych
-model_sup.compile("L-BFGS", loss="MSE")
-losshistory, train_state = model_sup.train(iterations=15000, display_every=1000)
-
-print("\nKrok 2: Fine-tuning z PDE + dane + BC")
-print("  Używamy własnej pętli treningowej aby dodać BC\n")
-
-# ============================================================
-# WŁASNA PĘTLA TRENINGOWA Z BC
-# ============================================================
-# Konwertujemy dane na tensory PyTorch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Punkty kolokacji PDE
-N_colloc = 20000
-N_colloc_each = N_colloc // 3
-N_colloc_last = N_colloc - 2 * N_colloc_each
+if TRAIN:
+    # DataSet dla supervised pretrain (PDE pominęte w tej fazie)
+    data_supervised = dde.data.DataSet(
+        X_train=X_obs, y_train=y_obs,
+        X_test=X_obs[:1000], y_test=y_obs[:1000],
+        standardize=False
+    )
+    model_sup = dde.Model(data_supervised, net)
 
-def sample_collocation(n_samples, onehot_vec):
-    t = np.random.uniform(0.0, 1.0, size=(n_samples, 1))
-    z = np.random.uniform(0.0, 1.0, size=(n_samples, 1))
-    onehot = np.repeat(np.array(onehot_vec, dtype=np.float64)[None, :], n_samples, axis=0)
-    return np.hstack([t, z, onehot])
+    print("\nKrok 1: Pre-trening na danych (supervised)")
+    model_sup.compile("adam", lr=1e-3, loss="MSE")
+    model_sup.train(iterations=15000, display_every=1000)
 
-X_colloc_np = np.vstack([
-    sample_collocation(N_colloc_each, [1.0, 0.0, 0.0]),
-    sample_collocation(N_colloc_each, [0.0, 1.0, 0.0]),
-    sample_collocation(N_colloc_last, [0.0, 0.0, 1.0]),
-])
-X_colloc = torch.tensor(X_colloc_np, dtype=torch.float64, device=device, requires_grad=True)
+    model_sup.compile("L-BFGS", loss="MSE")
+    model_sup.train(iterations=15000, display_every=1000)
 
-# Dane obserwowane
-X_obs_t = torch.tensor(X_obs, dtype=torch.float64, device=device)
-y_obs_t = torch.tensor(y_obs, dtype=torch.float64, device=device)
 
-# Punkty BC
-X_inlet_t = torch.tensor(X_inlet, dtype=torch.float64, device=device)
-Q_inlet_t = torch.tensor(Q_inlet_target, dtype=torch.float64, device=device)
+    # ============================================================
+    # WŁASNA PĘTLA TRENINGOWA Z BC ORAZ FIZYKĄ
+    # ============================================================
+    print("\nKrok 2: Fine-tuning z PDE + dane + BC")
+    print(f"Używane urządzenie do fine-tuningu: {device}")
 
-X_outlet_d1_t = torch.tensor(X_outlet_d1, dtype=torch.float64, device=device)
-X_outlet_d2_t = torch.tensor(X_outlet_d2, dtype=torch.float64, device=device)
+    N_colloc = 20000
+    N_colloc_each = N_colloc // 3
+    N_colloc_last = N_colloc - 2 * N_colloc_each
 
-X_junction_p_t = torch.tensor(X_junction_p, dtype=torch.float64, device=device)
-X_junction_d1_t = torch.tensor(X_junction_d1, dtype=torch.float64, device=device)
-X_junction_d2_t = torch.tensor(X_junction_d2, dtype=torch.float64, device=device)
+    def sample_collocation(n_samples, onehot_vec):
+        t = np.random.uniform(0.0, 1.0, size=(n_samples, 1))
+        z = np.random.uniform(0.0, 1.0, size=(n_samples, 1))
+        onehot = np.repeat(np.array(onehot_vec, dtype=np.float64)[None, :], n_samples, axis=0)
+        return np.hstack([t, z, onehot])
 
-# Pobieramy sieć PyTorch
-pinn_net = model.net.to(device)
-pinn_net.train()
+    X_colloc_np = np.vstack([
+        sample_collocation(N_colloc_each, [1.0, 0.0, 0.0]),
+        sample_collocation(N_colloc_each, [0.0, 1.0, 0.0]),
+        sample_collocation(N_colloc_last, [0.0, 0.0, 1.0]),
+    ])
+    X_colloc = torch.tensor(X_colloc_np, dtype=torch.float64, device=device, requires_grad=True)
 
-# Funkcja straty PDE
+    X_obs_t = torch.tensor(X_obs, dtype=torch.float64, device=device)
+    y_obs_t = torch.tensor(y_obs, dtype=torch.float64, device=device)
+
+    X_inlet_t = torch.tensor(X_inlet, dtype=torch.float64, device=device)
+    Q_inlet_t = torch.tensor(Q_inlet_target, dtype=torch.float64, device=device)
+
+    X_outlet_d1_t = torch.tensor(X_outlet_d1, dtype=torch.float64, device=device)
+    X_outlet_d2_t = torch.tensor(X_outlet_d2, dtype=torch.float64, device=device)
+    X_junction_p_t = torch.tensor(X_junction_p, dtype=torch.float64, device=device)
+    X_junction_d1_t = torch.tensor(X_junction_d1, dtype=torch.float64, device=device)
+    X_junction_d2_t = torch.tensor(X_junction_d2, dtype=torch.float64, device=device)
+
+    pinn_net = net.to(device)
+    pinn_net.train()
+else:
+    print(f"\nTrain=False: loading model weights from {MODEL_PATH}")
+    pinn_net = net.to(device)
+    state = torch.load(MODEL_PATH, map_location="cpu")
+    pinn_net.load_state_dict(state)
+    pinn_net.eval()
+
 def pde_loss_fn(x_colloc, net_model):
-    x_colloc.requires_grad_(True)
+    # Upewniamy się, że gradienty po x_colloc mogą być liczone
+    if not x_colloc.requires_grad:
+        x_colloc.requires_grad_(True)
+        
     y_pred = net_model(x_colloc)
     A_hat, Q_hat = y_pred[:, 0:1], y_pred[:, 1:2]
+    
+    # Usunięto barierę miękką, ponieważ teraz używamy Softplus w architekturze
+    barrier_loss = 0.0
+    
     A = A_hat * A_scale
     Q = Q_hat * Q_scale
 
-    # Gradienty
     A_hat_t = torch.autograd.grad(A_hat.sum(), x_colloc, create_graph=True)[0][:, 0:1]
     Q_hat_t = torch.autograd.grad(Q_hat.sum(), x_colloc, create_graph=True)[0][:, 0:1]
     A_hat_z = torch.autograd.grad(A_hat.sum(), x_colloc, create_graph=True)[0][:, 1:2]
     Q_hat_z = torch.autograd.grad(Q_hat.sum(), x_colloc, create_graph=True)[0][:, 1:2]
 
     onehot = x_colloc[:, 2:5]
-    beta_val = (beta_p * onehot[:, 0:1].detach() + beta_d1 * onehot[:, 1:2].detach() + beta_d2 * onehot[:, 2:3].detach())
-    L_val = (L_p * onehot[:, 0:1].detach() + L_d1 * onehot[:, 1:2].detach() + L_d2 * onehot[:, 2:3].detach())
+    beta_val = (beta_p * onehot[:, 0:1] + beta_d1 * onehot[:, 1:2] + beta_d2 * onehot[:, 2:3]).detach()
+    L_val = (L_p * onehot[:, 0:1] + L_d1 * onehot[:, 1:2] + L_d2 * onehot[:, 2:3]).detach()
 
     A_t = (A_scale / T_scale) * A_hat_t
     Q_t = (Q_scale / T_scale) * Q_hat_t
     A_z = (A_scale / L_val) * A_hat_z
     Q_z = (Q_scale / L_val) * Q_hat_z
 
-    # Continuity
     F_A = A_t + Q_z
 
-    # Momentum
-    dF2_dz = (2.0 * Q / A * Q_z - Q**2 / A**2 * A_z)
-    dP_dz = beta_val * A_z
-    viscous = KR * Q / A
+    # Zabezpieczony podział oraz pierwiastek w celu uniknięcia NaN podczas autograd
+    A_clamped = torch.clamp(A, min=1e-8)
+    
+    # Gradienty i składowe równania pędu
+    u = Q / A_clamped
+    dF2_dz = (2.0 * u * Q_z - (u**2) * A_z)
+    
+    # dP/dz = (beta / 2*sqrt(A)) * A_z
+    dP_dz = beta_val / (2.0 * safe_sqrt(A_clamped)) * A_z
+    viscous = KR * u
 
-    F_Q = Q_t + dF2_dz + A / rho * dP_dz + viscous
+    F_Q = Q_t + dF2_dz + A_clamped / rho * dP_dz + viscous
 
-    loss_pde = torch.mean(F_A**2) + torch.mean(F_Q**2)
+    # Normalizacja strat fizycznych
+    scale_FA = Q_scale / L_p
+    scale_FQ = Q_scale / T_scale
+    
+    loss_pde = torch.mean((F_A / scale_FA)**2) + torch.mean((F_Q / scale_FQ)**2) + barrier_loss
     return loss_pde
 
-
-# Funkcja straty BC
 def bc_loss_fn(net_model):
     loss_bc = 0.0
 
-    # 1. Inlet BC: Q(t, z=0, parent) = Q_in(t)
+    # 1. Inlet BC
     y_inlet = net_model(X_inlet_t)
     _, Q_pred_inlet = denorm_output(y_inlet)
-    loss_bc += torch.mean((Q_pred_inlet - Q_inlet_t)**2)
+    loss_bc += torch.mean(((Q_pred_inlet - Q_inlet_t) / Q_scale)**2)
 
-    # 2. Outlet BC (non-reflective): daughter1
-    # W2 = u - 2*c = W2_0 = -2*c0
+    # 2. Outlet BC d1
     y_out_d1 = net_model(X_outlet_d1_t)
     A_out_d1, Q_out_d1 = denorm_output(y_out_d1)
     W2_d1 = riemann_W2(A_out_d1, Q_out_d1, A0_d1, beta_d1)
-    loss_bc += torch.mean((W2_d1 - W2_0_d1)**2)
+    loss_bc += torch.mean(((W2_d1 - W2_0_d1) / c0)**2)
 
-    # 3. Outlet BC (non-reflective): daughter2
+    # 3. Outlet BC d2
     y_out_d2 = net_model(X_outlet_d2_t)
     A_out_d2, Q_out_d2 = denorm_output(y_out_d2)
     W2_d2 = riemann_W2(A_out_d2, Q_out_d2, A0_d2, beta_d2)
-    loss_bc += torch.mean((W2_d2 - W2_0_d2)**2)
+    loss_bc += torch.mean(((W2_d2 - W2_0_d2) / c0)**2)
 
     # 4. Bifurcation junction
     y_junc_p = net_model(X_junction_p_t)
@@ -427,88 +407,96 @@ def bc_loss_fn(net_model):
     A_j_d1, Q_j_d1 = denorm_output(y_junc_d1)
     A_j_d2, Q_j_d2 = denorm_output(y_junc_d2)
 
-    # 4a. Conservation of mass: Q_p = Q_d1 + Q_d2
-    loss_bc += torch.mean((Q_j_p - Q_j_d1 - Q_j_d2)**2)
+    # Mass conservation
+    loss_bc += torch.mean(((Q_j_p - Q_j_d1 - Q_j_d2) / Q_scale)**2)
 
-    # 4b. Total pressure continuity: P_tot_p = P_tot_d1
+    # Total pressure continuity
     P_tot_p = total_pressure(A_j_p, Q_j_p, A0_p, beta_p)
     P_tot_d1 = total_pressure(A_j_d1, Q_j_d1, A0_d1, beta_d1)
     P_tot_d2 = total_pressure(A_j_d2, Q_j_d2, A0_d2, beta_d2)
-    loss_bc += torch.mean((P_tot_p - P_tot_d1)**2)
-    loss_bc += torch.mean((P_tot_p - P_tot_d2)**2)
+    
+    # Skalowanie ciśnienia do rzędu O(1)
+    loss_bc += torch.mean(((P_tot_p - P_tot_d1) / P_scale)**2)
+    loss_bc += torch.mean(((P_tot_p - P_tot_d2) / P_scale)**2)
 
     return loss_bc
 
 
-# Optymalizacja
-optimizer = torch.optim.Adam(pinn_net.parameters(), lr=1e-4)
+if TRAIN:
+    optimizer = torch.optim.Adam(pinn_net.parameters(), lr=1e-4)
 
-# Wagi strat
-w_data = 1.0
-w_pde = 0.1
-w_bc = 0.5
+    # Zbalansowane wagi
+    w_data = 1.0
+    w_pde = 1.0
+    w_bc = 1.0
 
-N_iter = 20000
-print(f"  Training for {N_iter} iterations...")
-print(f"  Weights: data={w_data}, pde={w_pde}, bc={w_bc}")
-print()
+    N_iter = 20000
+    print(f"  Training for {N_iter} iterations...")
 
-for it in range(N_iter):
-    optimizer.zero_grad()
+    for it in range(N_iter):
+        optimizer.zero_grad()
+        y_pred_data = pinn_net(X_obs_t)
+        loss_data = torch.mean((y_pred_data - y_obs_t)**2)
+        loss_pde = pde_loss_fn(X_colloc, pinn_net)
+        loss_bc_val = bc_loss_fn(pinn_net)
 
-    # Data loss
-    y_pred_data = pinn_net(X_obs_t)
-    loss_data = torch.mean((y_pred_data - y_obs_t)**2)
+        loss_total = w_data * loss_data + w_pde * loss_pde + w_bc * loss_bc_val
 
-    # PDE loss
-    loss_pde = pde_loss_fn(X_colloc, pinn_net)
+        # Bezpieczne sprawdzanie przed backward (zapobieganie przerwaniu z powodu NaN)
+        if torch.isnan(loss_total):
+            print(f"UWAGA: Wykryto NaN w iteracji {it+1}! Przerywam pętlę i przechodzę do L-BFGS.")
+            break
 
-    # BC loss
-    loss_bc_val = bc_loss_fn(pinn_net)
+        loss_total.backward()
 
-    # Total loss
-    loss_total = w_data * loss_data + w_pde * loss_pde + w_bc * loss_bc_val
+        # Gradient clipping chroniący przed niestabilnościami wywołanymi przez pomyłki sieci
+        torch.nn.utils.clip_grad_norm_(pinn_net.parameters(), max_norm=1.0)
+        optimizer.step()
 
-    loss_total.backward()
-    optimizer.step()
+        if (it + 1) % 1000 == 0:
+            print(f"  iter {it+1:6d}/{N_iter}: total={loss_total.item():.4e}, "
+                  f"data={loss_data.item():.4e}, pde={loss_pde.item():.4e}, "
+                  f"bc={loss_bc_val.item():.4e}")
 
-    if (it + 1) % 1000 == 0:
-        print(f"  iter {it+1:6d}/{N_iter}: total={loss_total.item():.6e}, "
-              f"data={loss_data.item():.6e}, pde={loss_pde.item():.6e}, "
-              f"bc={loss_bc_val.item():.6e}")
+    print("\n  L-BFGS fine-tuning...")
+    lbfgs = torch.optim.LBFGS(pinn_net.parameters(), max_iter=5000, line_search_fn="strong_wolfe")
 
-# L-BFGS fine-tuning (wszystkie straty łącznie)
-print("\n  L-BFGS fine-tuning...")
-lbfgs = torch.optim.LBFGS(
-    pinn_net.parameters(),
-    max_iter=5000,
-    history_size=50,
-    line_search_fn="strong_wolfe",
-)
+    def lbfgs_closure():
+        lbfgs.zero_grad()
+        y_pred_data = pinn_net(X_obs_t)
+        loss_data = torch.mean((y_pred_data - y_obs_t)**2)
+        loss_pde = pde_loss_fn(X_colloc, pinn_net)
+        loss_bc_val = bc_loss_fn(pinn_net)
+        loss_total = w_data * loss_data + w_pde * loss_pde + w_bc * loss_bc_val
+        if not torch.isnan(loss_total):
+            loss_total.backward()
+        return loss_total
 
-def lbfgs_closure():
-    lbfgs.zero_grad()
-    y_pred_data = pinn_net(X_obs_t)
-    loss_data = torch.mean((y_pred_data - y_obs_t)**2)
-    loss_pde = pde_loss_fn(X_colloc, pinn_net)
-    loss_bc_val = bc_loss_fn(pinn_net)
-    loss_total = w_data * loss_data + w_pde * loss_pde + w_bc * loss_bc_val
-    loss_total.backward()
-    return loss_total
+    try:
+        lbfgs.step(lbfgs_closure)
+    except Exception as e:
+        print(
+            "L-BFGS napotkał błąd podczas optymalizacji "
+            f"(prawdopodobnie gradienty osiągnęły NaN): {e}"
+        )
 
-lbfgs.step(lbfgs_closure)
-
+# ============================================================
+# EWALUACJA I ZAPIS
+# ============================================================
 print("\nKrok 4: Końcowa ocena")
-print()
-
-# ============================================================
-# EWALUACJA
-# ============================================================
-print("Ewaluacja na danych treningowych...")
 pinn_net.eval()
-pinn_net = pinn_net.to("cpu")
+
+# POZOSTAWIAMY sieć na aktywnym urządzeniu (np. GPU) podczas ewaluacji,
+# aby uniknąć błędów związanych z przenoszeniem wewnętrznych tensorów.
+# Konwertujemy tylko wejściowe i wyjściowe tensory.
+eval_device = next(pinn_net.parameters()).device
+print(f"Ewaluacja przeprowadzana na urządzeniu: {eval_device}...")
+
+print("Ewaluacja na danych treningowych...")
 with torch.no_grad():
-    y_pred = pinn_net(torch.tensor(X_obs, dtype=torch.float64)).cpu().numpy()
+    # Dane wejściowe muszą być na tym samym urządzeniu co model!
+    X_obs_tensor = torch.tensor(X_obs, dtype=torch.float64, device=eval_device)
+    y_pred = pinn_net(X_obs_tensor).cpu().numpy()
 A_pred = y_pred[:, 0] * A_scale
 Q_pred = y_pred[:, 1] * Q_scale
 
@@ -522,69 +510,106 @@ print()
 # Ewaluacja BC
 print("Ewaluacja warunków brzegowych...")
 with torch.no_grad():
-    y_inlet_pred = pinn_net(torch.tensor(X_inlet, dtype=torch.float64)).cpu().numpy()
+    X_inlet_tensor = torch.tensor(X_inlet, dtype=torch.float64, device=eval_device)
+    y_inlet_pred = pinn_net(X_inlet_tensor).cpu().numpy()
 Q_inlet_pred = y_inlet_pred[:, 1] * Q_scale
 err_inlet_Q = np.abs(Q_inlet_pred - Q_inlet_target[:, 0])
 print(f"  Inlet BC Q: mean_err={np.mean(err_inlet_Q):.4e}, max_err={np.max(err_inlet_Q):.4e}")
 
-y_out_d1_pred = pinn_net(torch.tensor(X_outlet_d1, dtype=torch.float64)).cpu().numpy()
+with torch.no_grad():
+    X_outlet_d1_tensor = torch.tensor(X_outlet_d1, dtype=torch.float64, device=eval_device)
+    y_out_d1_pred = pinn_net(X_outlet_d1_tensor).cpu().numpy()
 A_od1 = y_out_d1_pred[:, 0] * A_scale
 Q_od1 = y_out_d1_pred[:, 1] * Q_scale
-c_d1_pred = np.sqrt(beta_d1 * np.maximum(A_od1, 1e-12) / rho)
+c_d1_pred = np.sqrt(beta_d1 / (2.0 * rho)) * np.power(np.maximum(A_od1, 1e-12), 0.25)
 u_d1_pred = Q_od1 / np.maximum(A_od1, 1e-12)
-W2_d1_pred = u_d1_pred - 2.0 * c_d1_pred
+W2_d1_pred = u_d1_pred - 4.0 * c_d1_pred
 err_W2_d1 = np.abs(W2_d1_pred - W2_0_d1)
 print(f"  Outlet BC d1 W2: mean_err={np.mean(err_W2_d1):.4e}, max_err={np.max(err_W2_d1):.4e}")
 
-y_out_d2_pred = pinn_net(torch.tensor(X_outlet_d2, dtype=torch.float64)).cpu().numpy()
+with torch.no_grad():
+    X_outlet_d2_tensor = torch.tensor(X_outlet_d2, dtype=torch.float64, device=eval_device)
+    y_out_d2_pred = pinn_net(X_outlet_d2_tensor).cpu().numpy()
 A_od2 = y_out_d2_pred[:, 0] * A_scale
 Q_od2 = y_out_d2_pred[:, 1] * Q_scale
-c_d2_pred = np.sqrt(beta_d2 * np.maximum(A_od2, 1e-12) / rho)
+c_d2_pred = np.sqrt(beta_d2 / (2.0 * rho)) * np.power(np.maximum(A_od2, 1e-12), 0.25)
 u_d2_pred = Q_od2 / np.maximum(A_od2, 1e-12)
-W2_d2_pred = u_d2_pred - 2.0 * c_d2_pred
+W2_d2_pred = u_d2_pred - 4.0 * c_d2_pred
 err_W2_d2 = np.abs(W2_d2_pred - W2_0_d2)
 print(f"  Outlet BC d2 W2: mean_err={np.mean(err_W2_d2):.4e}, max_err={np.max(err_W2_d2):.4e}")
 
-y_junc_p_pred = pinn_net(torch.tensor(X_junction_p, dtype=torch.float64)).cpu().numpy()
-y_junc_d1_pred = pinn_net(torch.tensor(X_junction_d1, dtype=torch.float64)).cpu().numpy()
-y_junc_d2_pred = pinn_net(torch.tensor(X_junction_d2, dtype=torch.float64)).cpu().numpy()
+with torch.no_grad():
+    X_junction_p_tensor = torch.tensor(X_junction_p, dtype=torch.float64, device=eval_device)
+    X_junction_d1_tensor = torch.tensor(X_junction_d1, dtype=torch.float64, device=eval_device)
+    X_junction_d2_tensor = torch.tensor(X_junction_d2, dtype=torch.float64, device=eval_device)
+    
+    y_junc_p_pred = pinn_net(X_junction_p_tensor).cpu().numpy()
+    y_junc_d1_pred = pinn_net(X_junction_d1_tensor).cpu().numpy()
+    y_junc_d2_pred = pinn_net(X_junction_d2_tensor).cpu().numpy()
 Q_jp = y_junc_p_pred[:, 1] * Q_scale
 Q_jd1 = y_junc_d1_pred[:, 1] * Q_scale
 Q_jd2 = y_junc_d2_pred[:, 1] * Q_scale
 err_mass = np.abs(Q_jp - Q_jd1 - Q_jd2)
 print(f"  Junction mass conservation: mean_err={np.mean(err_mass):.4e}, max_err={np.max(err_mass):.4e}")
-
 print()
 
 # ============================================================
 # ZAPIS MODELU
 # ============================================================
-model.net = pinn_net
-model.save("pinn_blood_flow_model")
-print("Model zapisany jako pinn_blood_flow_model")
+if TRAIN:
+    state_dict_cpu = {k: v.cpu() for k, v in pinn_net.state_dict().items()}
+    torch.save(state_dict_cpu, MODEL_PATH)
+    print(f"Model zapisany jako {MODEL_PATH}")
 
 # ============================================================
 # PREDYKCJA
 # ============================================================
 print("\nGenerowanie predykcji na siatce...")
-Nt_grid = 100
+pred_device = next(pinn_net.parameters()).device
+
+# Zrównanie czasu z solver.py
+dt_min = 0.3 * min(L_p/60, L_d1/48, L_d2/54) / c0
+Nt_sim = int(np.ceil(T_out / dt_min))
+step_sim = max(1, Nt_sim // 200)
+frame_indices_sim = list(range(0, Nt_sim, step_sim))
+time_vals_sim = np.linspace(0, T_out, Nt_sim)
+
+t_grid = time_vals_sim[frame_indices_sim]
+Nt_grid = len(t_grid)
 Nz_grid = 50
-t_grid = np.linspace(0, T_out, Nt_grid)
-z_norm = np.linspace(0, 1, Nz_grid)
+z_norm_vals = np.linspace(0, 1, Nz_grid)
 t_grid_norm = t_grid / T_scale
 
 rows = []
+A_pred_p = np.zeros((Nt_grid, Nz_grid), dtype=np.float64)
+Q_pred_p = np.zeros((Nt_grid, Nz_grid), dtype=np.float64)
+A_pred_d1 = np.zeros((Nt_grid, Nz_grid), dtype=np.float64)
+Q_pred_d1 = np.zeros((Nt_grid, Nz_grid), dtype=np.float64)
+A_pred_d2 = np.zeros((Nt_grid, Nz_grid), dtype=np.float64)
+Q_pred_d2 = np.zeros((Nt_grid, Nz_grid), dtype=np.float64)
 for i, t_val in enumerate(t_grid):
-    for z_val in z_norm:
+    for j, z_val in enumerate(z_norm_vals):
         for vid, (L, name) in enumerate([
             (L_p, "parent"), (L_d1, "daughter1"), (L_d2, "daughter2")
         ]):
             onehot = [1, 0, 0] if vid == 0 else ([0, 1, 0] if vid == 1 else [0, 0, 1])
             x_in = np.array([[t_grid_norm[i], z_val, *onehot]], dtype=np.float64)
             with torch.no_grad():
-                y_out = pinn_net(torch.tensor(x_in, dtype=torch.float64)).cpu().numpy()
-            rows.append([t_val, z_val * L, name,
-                         float(y_out[0, 0] * A_scale), float(y_out[0, 1] * Q_scale)])
+                # Model i wejscie na tym samym urzadzeniu.
+                x_tensor = torch.tensor(x_in, dtype=torch.float64, device=pred_device)
+                y_out = pinn_net(x_tensor).detach().cpu().numpy()
+            A_val = float(y_out[0, 0] * A_scale)
+            Q_val = float(y_out[0, 1] * Q_scale)
+            rows.append([t_val, z_val * L, name, A_val, Q_val])
+            if vid == 0:
+                A_pred_p[i, j] = A_val
+                Q_pred_p[i, j] = Q_val
+            elif vid == 1:
+                A_pred_d1[i, j] = A_val
+                Q_pred_d1[i, j] = Q_val
+            else:
+                A_pred_d2[i, j] = A_val
+                Q_pred_d2[i, j] = Q_val
 
     if (i + 1) % 25 == 0:
         print(f"  Predykcja: {i+1}/{Nt_grid}")
@@ -592,5 +617,151 @@ for i, t_val in enumerate(t_grid):
 df_pred = pd.DataFrame(rows, columns=["t", "z", "vessel", "A", "Q"])
 df_pred.to_csv("pinn_prediction.csv", index=False)
 print("Zapisano pinn_prediction.csv")
+
+# ============================================================
+# WIZUALIZACJA 3D - PyVista (predykcje PINN)
+# ============================================================
+deformation_scale = 15.0
+bif_angle = np.deg2rad(30)
+
+z_phys_p = z_norm_vals * L_p
+z_phys_d1 = z_norm_vals * L_d1
+z_phys_d2 = z_norm_vals * L_d2
+
+x_p = z_phys_p
+y_p = np.zeros_like(x_p)
+z_p = np.zeros_like(x_p)
+
+x_d1 = L_p + z_phys_d1 * np.cos(bif_angle)
+y_d1 = z_phys_d1 * np.sin(bif_angle)
+z_d1 = np.zeros_like(z_phys_d1)
+
+x_d2 = L_p + z_phys_d2 * np.cos(bif_angle)
+y_d2 = np.zeros_like(z_phys_d2)
+z_d2 = -z_phys_d2 * np.sin(bif_angle)
+
+N_theta = 20
+theta_vals = np.linspace(0, 2 * np.pi, N_theta, endpoint=True)
+
+R0_p = np.sqrt(A0_p / np.pi)
+R0_d1 = np.sqrt(A0_d1 / np.pi)
+R0_d2 = np.sqrt(A0_d2 / np.pi)
+
+Qmax_global = max(
+    np.max(np.abs(Q_pred_p)),
+    np.max(np.abs(Q_pred_d1)),
+    np.max(np.abs(Q_pred_d2))
+)
+Qmax_global = max(Qmax_global, 1e-10)
+Qmax = Qmax_global * 1e6
+print(f"Globalne max Q (PINN): {Qmax:.2f} ml/s")
+
+
+def build_vessel_grid(x_c, y_c, z_c, R_vals):
+    N_z = len(x_c)
+    dx = np.gradient(x_c)
+    dy = np.gradient(y_c)
+    dz = np.gradient(z_c)
+    pts = np.zeros((N_theta, N_z, 3))
+
+    for i in range(N_z):
+        t = np.array([dx[i], dy[i], dz[i]])
+        tnorm = np.linalg.norm(t)
+        if tnorm < 1e-15:
+            t = np.array([1.0, 0.0, 0.0])
+        else:
+            t = t / tnorm
+        if abs(t[0]) < 0.9:
+            u = np.cross(t, np.array([1.0, 0.0, 0.0]))
+        else:
+            u = np.cross(t, np.array([0.0, 1.0, 0.0]))
+        unorm = np.linalg.norm(u)
+        if unorm > 1e-15:
+            u = u / unorm
+        else:
+            u = np.array([0.0, 1.0, 0.0])
+        v = np.cross(t, u)
+        center = np.array([x_c[i], y_c[i], z_c[i]])
+        R = R_vals[i]
+        for j in range(N_theta):
+            theta = theta_vals[j]
+            pt = center + R * (np.cos(theta) * u + np.sin(theta) * v)
+            pts[j, i] = pt
+
+    grid = pv.StructuredGrid(pts[:, :, 0], pts[:, :, 1], pts[:, :, 2])
+    return grid
+
+
+step = 1
+frame_indices = list(range(0, Nt_grid, step))
+
+all_grids_p = []
+all_grids_d1 = []
+all_grids_d2 = []
+
+for idx in frame_indices:
+    A_p_f = A_pred_p[idx]
+    Q_p_f = Q_pred_p[idx]
+    A_d1_f = A_pred_d1[idx]
+    Q_d1_f = Q_pred_d1[idx]
+    A_d2_f = A_pred_d2[idx]
+    Q_d2_f = Q_pred_d2[idx]
+
+    R_p_f = R0_p + (np.sqrt(np.maximum(A_p_f, 1e-12) / np.pi) - R0_p) * deformation_scale
+    R_d1_f = R0_d1 + (np.sqrt(np.maximum(A_d1_f, 1e-12) / np.pi) - R0_d1) * deformation_scale
+    R_d2_f = R0_d2 + (np.sqrt(np.maximum(A_d2_f, 1e-12) / np.pi) - R0_d2) * deformation_scale
+
+    g_p = build_vessel_grid(x_p, y_p, z_p, R_p_f)
+    g_d1 = build_vessel_grid(x_d1, y_d1, z_d1, R_d1_f)
+    g_d2 = build_vessel_grid(x_d2, y_d2, z_d2, R_d2_f)
+
+    Qp_flat = np.tile(Q_p_f * 1e6, (N_theta, 1)).ravel(order='F')
+    Qd1_flat = np.tile(Q_d1_f * 1e6, (N_theta, 1)).ravel(order='F')
+    Qd2_flat = np.tile(Q_d2_f * 1e6, (N_theta, 1)).ravel(order='F')
+
+    g_p.point_data['Q'] = Qp_flat
+    g_d1.point_data['Q'] = Qd1_flat
+    g_d2.point_data['Q'] = Qd2_flat
+
+    all_grids_p.append(g_p)
+    all_grids_d1.append(g_d1)
+    all_grids_d2.append(g_d2)
+
+print("Eksportowanie animacji do GIF (PINN)...")
+pv.set_plot_theme('dark')
+p = pv.Plotter(window_size=[1200, 800], off_screen=True)
+
+bifurcation_point = (L_p, 0.0, 0.0)
+p.camera_position = [(0.36, -0.24, 0.15),
+                     bifurcation_point,
+                     (0.0, 0.0, 1.0)]
+p.enable_anti_aliasing()
+p.add_axes()
+
+p.open_gif("pinn_prediction.gif", fps=25)
+
+n_cycles = 1
+for cycle in range(n_cycles):
+    for idx, frame_idx in enumerate(frame_indices):
+        p.clear()
+        p.add_mesh(all_grids_p[idx], scalars='Q', clim=[0, Qmax],
+                   cmap='plasma', show_edges=False, lighting=True,
+                   smooth_shading=True)
+        p.add_mesh(all_grids_d1[idx], scalars='Q', clim=[0, Qmax],
+                   cmap='plasma', show_edges=False, lighting=True,
+                   smooth_shading=True)
+        p.add_mesh(all_grids_d2[idx], scalars='Q', clim=[0, Qmax],
+                   cmap='plasma', show_edges=False, lighting=True,
+                   smooth_shading=True)
+
+        t_val = t_grid[frame_idx]
+        p.add_text(f"Czas: {t_val:.3f} s",
+                   position='upper_left', font_size=14, color='white')
+        p.write_frame()
+
+    print(f"  Cykl {cycle+1}/{n_cycles} ({len(frame_indices)} klatek)")
+
+p.close()
+print(f"Zapisano pinn_prediction.gif ({len(frame_indices) * n_cycles} klatek, {n_cycles} cykli)")
 
 print("\nGotowe!")

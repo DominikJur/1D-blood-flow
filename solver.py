@@ -16,7 +16,7 @@ import pyvista as pv
 rho = 1060.0       # Gęstość krwi [kg/m^3]
 mu = 4.0e-3        # Lepkość krwi [Pa·s]
 KR = 8.0 * np.pi * mu / rho  # Współczynnik tarcia (Poiseuille, gamma=2)
-CFL = 0.45
+CFL = 0.30         # ZMIEJSZONO DLA STABILNOŚCI ADAMS-BASHFORTH
 T_out = 0.75       # Czas symulacji [s]
 
 # ============================================================
@@ -32,9 +32,8 @@ class Vessel:
         self.name = name
         self.dx = L / N
         self.x = np.linspace(self.dx/2, L - self.dx/2, N)
-        # beta zgodnie z publikacją (liniowa relacja P = beta*(A - A0))
-        # c0^2 = beta * A0 / rho
-        self.beta = rho * c0**2 / self.A0
+        # beta zgodnie z publikacją: c0 = sqrt(beta/(2*rho)) * A0^(1/4)
+        self.beta = 2.0 * rho * c0**2 / np.sqrt(self.A0)
         self.A = np.ones(N) * self.A0
         self.Q = np.zeros(N)
         self.A_hist = []
@@ -46,35 +45,35 @@ class Vessel:
 # FUNKCJE POMOCNICZE (zgodne z publikacją)
 # ============================================================
 def pressure(A, A0, beta):
-    # P = Pext + beta * (A - A0), Pext=0
-    return beta * (A - A0)
+    # P = Pext + beta * (sqrt(A) - sqrt(A0)), Pext=0
+    return beta * (np.sqrt(A) - np.sqrt(A0))
 
 def wave_speed(A, A0, beta):
-    # c = sqrt(beta * A / rho)
-    return np.sqrt(beta * A / rho)
+    # c = sqrt(beta/(2*rho)) * A^(1/4)
+    return np.sqrt(beta / (2.0 * rho)) * np.power(A, 0.25)
 
 def total_pressure(A, Q, A0, beta):
     return pressure(A, A0, beta) + 0.5 * rho * (Q / A)**2
 
 def flux_func(A, Q, A0, beta):
     F1 = Q
-    # F2 = Q^2/A + beta/(2*rho) * A^2
-    F2 = Q**2 / A + beta / (2.0 * rho) * A**2
+    # F2 = Q^2/A + beta/(3*rho) * A^(3/2)  [str. 14]
+    F2 = Q**2 / A + beta / (3.0 * rho) * np.power(A, 1.5)
     return np.array([F1, F2])
 
 def riemann_W1(A, Q, A0, beta):
     c = wave_speed(A, A0, beta)
-    return Q / A + 2.0 * c
+    return Q / A + 4.0 * c
 
 def riemann_W2(A, Q, A0, beta):
     c = wave_speed(A, A0, beta)
-    return Q / A - 2.0 * c
+    return Q / A - 4.0 * c
 
 def from_riemann(W1, W2, A0, beta):
-    # c = (W1 - W2)/4
-    # A = rho * c^2 / beta
-    c = (W1 - W2) / 4.0
-    A = rho * c**2 / beta
+    # c = (W1 - W2)/8
+    # A = (2*rho*c^2 / beta)^2
+    c = (W1 - W2) / 8.0
+    A = np.power(2.0 * rho * c**2 / beta, 2.0)
     u = (W1 + W2) / 2.0
     Q = A * u
     return A, Q
@@ -163,11 +162,11 @@ def apply_inlet_BC(vessel, t, dt, UL, UR):
     # Ekstrapolacja W2 (charakterystyka wychodząca, lambda2 < 0) [str. 19]
     W2_new = W2_0 + dt * (W2_dz - W2_0) / vessel.dx * (-(u0 - c0))
 
-    # Rozwiązanie nieliniowe: Q_in/A - 2*c(A) - W2_new = 0
+    # Rozwiązanie nieliniowe: Q_in/A - 4*c(A) - W2_new = 0
     A_guess = max(A0_cell, A0)
     for _ in range(15):
         cA = wave_speed(A_guess, A0, beta)
-        F_val = Q_in / A_guess - 2.0 * cA - W2_new
+        F_val = Q_in / A_guess - 4.0 * cA - W2_new
         if abs(F_val) < 1e-14:
             break
         dF = -Q_in / A_guess**2 - cA / A_guess
@@ -196,8 +195,8 @@ def apply_outlet_BC(vessel, dt, UL, UR, Rt=0.0):
 
     u0 = 0.0
     c0 = wave_speed(A0, A0, beta)
-    W1_0 = u0 + 2.0 * c0
-    W2_0 = u0 - 2.0 * c0
+    W1_0 = u0 + 4.0 * c0
+    W2_0 = u0 - 4.0 * c0
     W2_new = W2_0 - Rt * (W1_new - W1_0)
 
     A_out, Q_out = from_riemann(W1_new, W2_new, A0, beta)
@@ -207,21 +206,21 @@ def apply_outlet_BC(vessel, dt, UL, UR, Rt=0.0):
 
 
 # ============================================================
-# SOLVER BIFURKACJI (NEWTON-RAPHSON) - sekcja 7
+# SOLVER BIFURKACJI (NEWTON-RAPHSON) - sekcja 7 (Z UODPORNIENIEM)
 # ============================================================
-def solve_bifurcation(vessel_p, vessel_d1, vessel_d2, dt, tol=1e-12, max_iter=30):
+def solve_bifurcation(vessel_p, vessel_d1, vessel_d2, dt, tol=1e-8, max_iter=50):
     A0_p, beta_p = vessel_p.A0, vessel_p.beta
     A0_d1, beta_d1 = vessel_d1.A0, vessel_d1.beta
     A0_d2, beta_d2 = vessel_d2.A0, vessel_d2.beta
 
-    # Ekstrapolacja W1 parent (outgoing)
+    # Ekstrapolacja W1 parent (outgoing) - POPRAWIONY ZNAK (W1_p_m1 - W1_p to pochodna upwind)
     A_L, A_Lm1 = vessel_p.A[-1], vessel_p.A[-2]
     Q_L, Q_Lm1 = vessel_p.Q[-1], vessel_p.Q[-2]
     W1_p = riemann_W1(A_L, Q_L, A0_p, beta_p)
     W1_p_m1 = riemann_W1(A_Lm1, Q_Lm1, A0_p, beta_p)
     u_L = Q_L / A_L
     c_L = wave_speed(A_L, A0_p, beta_p)
-    W1_p_ext = W1_p + dt * (W1_p - W1_p_m1) / vessel_p.dx * (u_L + c_L)
+    W1_p_ext = W1_p + dt * (W1_p_m1 - W1_p) / vessel_p.dx * (u_L + c_L)
 
     # Ekstrapolacja W2 daughter 1 (incoming)
     A_0, A_1 = vessel_d1.A[0], vessel_d1.A[1]
@@ -245,6 +244,17 @@ def solve_bifurcation(vessel_p, vessel_d1, vessel_d2, dt, tol=1e-12, max_iter=30
                   vessel_d1.A[0], vessel_d1.Q[0],
                   vessel_d2.A[0], vessel_d2.Q[0]])
 
+    # --- NOWE: Wektory skalujące do rzędu wielkości O(1) ---
+    c0_ref = wave_speed(A0_p, A0_p, beta_p)
+    scale = np.array([
+        1.0 / A0_p,                   # F0 (Masa)
+        1.0 / (rho * c0_ref**2),      # F1 (Ciśnienie)
+        1.0 / (rho * c0_ref**2),      # F2 (Ciśnienie)
+        1.0 / c0_ref,                 # F3 (Charakterystyka 1)
+        1.0 / c0_ref,                 # F4 (Charakterystyka 2)
+        1.0 / c0_ref                  # F5 (Charakterystyka 3)
+    ])
+
     for it in range(max_iter):
         A_p, Q_p, A_d1, Q_d1, A_d2, Q_d2 = x
         u_p = Q_p / A_p
@@ -262,49 +272,51 @@ def solve_bifurcation(vessel_p, vessel_d1, vessel_d2, dt, tol=1e-12, max_iter=30
             Q_p - Q_d1 - Q_d2,
             P_tot_p - P_tot_d1,
             P_tot_p - P_tot_d2,
-            u_p + 2.0 * c_p - W1_p_ext,
-            u_d1 - 2.0 * c_d1 - W2_d1_ext,
-            u_d2 - 2.0 * c_d2 - W2_d2_ext,
+            u_p + 4.0 * c_p - W1_p_ext,
+            u_d1 - 4.0 * c_d1 - W2_d1_ext,
+            u_d2 - 4.0 * c_d2 - W2_d2_ext,
         ])
-        if np.max(np.abs(F)) < tol:
+        
+        # --- NOWE: Skalujemy reszty przed sprawdzeniem zbieżności ---
+        F_scaled = F * scale
+        if np.max(np.abs(F_scaled)) < tol:
             break
 
         J = np.zeros((6, 6))
-        J[0, 1] = 1.0
-        J[0, 3] = -1.0
-        J[0, 5] = -1.0
+        J[0, 1] = 1.0; J[0, 3] = -1.0; J[0, 5] = -1.0
 
-        # Pochodne ciśnienia dla liniowej relacji P = beta*(A - A0)
         def dPtot_dA(A_, Q_, A0_, beta_):
-            return beta_ - rho * Q_**2 / A_**3
-
+            return beta_ / (2.0 * np.sqrt(A_)) - rho * Q_**2 / A_**3
         def dPtot_dQ(A_, Q_, A0_, beta_):
             return rho * Q_ / A_**2
 
-        J[1, 0] = dPtot_dA(A_p, Q_p, A0_p, beta_p)
-        J[1, 1] = dPtot_dQ(A_p, Q_p, A0_p, beta_p)
-        J[1, 2] = -dPtot_dA(A_d1, Q_d1, A0_d1, beta_d1)
-        J[1, 3] = -dPtot_dQ(A_d1, Q_d1, A0_d1, beta_d1)
+        J[1, 0] = dPtot_dA(A_p, Q_p, A0_p, beta_p); J[1, 1] = dPtot_dQ(A_p, Q_p, A0_p, beta_p)
+        J[1, 2] = -dPtot_dA(A_d1, Q_d1, A0_d1, beta_d1); J[1, 3] = -dPtot_dQ(A_d1, Q_d1, A0_d1, beta_d1)
+        J[2, 0] = dPtot_dA(A_p, Q_p, A0_p, beta_p); J[2, 1] = dPtot_dQ(A_p, Q_p, A0_p, beta_p)
+        J[2, 4] = -dPtot_dA(A_d2, Q_d2, A0_d2, beta_d2); J[2, 5] = -dPtot_dQ(A_d2, Q_d2, A0_d2, beta_d2)
 
-        J[2, 0] = dPtot_dA(A_p, Q_p, A0_p, beta_p)
-        J[2, 1] = dPtot_dQ(A_p, Q_p, A0_p, beta_p)
-        J[2, 4] = -dPtot_dA(A_d2, Q_d2, A0_d2, beta_d2)
-        J[2, 5] = -dPtot_dQ(A_d2, Q_d2, A0_d2, beta_d2)
+        J[3, 0] = -Q_p / A_p**2 + c_p / A_p; J[3, 1] = 1.0 / A_p
+        J[4, 2] = -Q_d1 / A_d1**2 - c_d1 / A_d1; J[4, 3] = 1.0 / A_d1
+        J[5, 4] = -Q_d2 / A_d2**2 - c_d2 / A_d2; J[5, 5] = 1.0 / A_d2
 
-        J[3, 0] = -Q_p / A_p**2 + c_p / A_p
-        J[3, 1] = 1.0 / A_p
-
-        J[4, 2] = -Q_d1 / A_d1**2 - c_d1 / A_d1
-        J[4, 3] = 1.0 / A_d1
-
-        J[5, 4] = -Q_d2 / A_d2**2 - c_d2 / A_d2
-        J[5, 5] = 1.0 / A_d2
+        # --- NOWE: Skalujemy macierz przed inwersją ---
+        J_scaled = J * scale[:, np.newaxis]
 
         try:
-            dx_nr = np.linalg.solve(J, -F)
+            dx_nr = np.linalg.solve(J_scaled, -F_scaled)
         except np.linalg.LinAlgError:
-            dx_nr = np.linalg.lstsq(J, -F, rcond=None)[0]
+            dx_nr = np.linalg.lstsq(J_scaled, -F_scaled, rcond=None)[0]
+
+        # --- NOWE: Damping (Tłumienie) zapobiegające przestrzeleniom A ---
+        max_step_ratio = 1.0
+        for i in [0, 2, 4]: 
+            ratio = np.abs(dx_nr[i]) / (0.2 * x[i])
+            if ratio > max_step_ratio:
+                max_step_ratio = ratio
+        
+        dx_nr = dx_nr / max_step_ratio
         x = x + dx_nr
+        
         x[0] = max(x[0], A0_p * 0.1)
         x[2] = max(x[2], A0_d1 * 0.1)
         x[4] = max(x[4], A0_d2 * 0.1)
@@ -433,7 +445,7 @@ print()
 # ============================================================
 # WIZUALIZACJA 3D - PyVista
 # ============================================================
-deformation_scale = 3.0
+deformation_scale = 15.0
 bif_angle = np.deg2rad(30)
 
 # Geometria 3D
