@@ -6,9 +6,9 @@ results for PINN training and visualization.
 
 ## Model Summary
 - Variables: cross-sectional area A, flow rate Q, pressure P.
-- Tube law (linear): P = beta * (A - A0).
-- Wave speed: c = sqrt(beta * A / rho).
-- Riemann invariants: W1 = u + 2c, W2 = u - 2c, u = Q / A.
+- Tube law (nonlinear): P = beta * (sqrt(A) - sqrt(A0)).
+- Wave speed: c = sqrt(beta / (2 * rho)) * A^(1/4).
+- Riemann invariants: W1 = u + 4c, W2 = u - 4c, u = Q / A.
 
 ## Governing Equations (A, Q form)
 - Continuity: dA/dt + dQ/dz = 0
@@ -38,7 +38,7 @@ results for PINN training and visualization.
 - If you change the tube law or parameters, regenerate blood_flow_data.csv before PINN training.
 
 ## Notes
-- The solver uses the linear tube law from the paper. If you switch to another model,
+- The solver uses a nonlinear tube law (P proportional to sqrt(A)). If you switch to another model,
   update pressure, wave speed, flux, and Riemann invariants consistently.
 - PyVista is required for the GIF; you can comment out the visualization section
   if you only need CSV output.

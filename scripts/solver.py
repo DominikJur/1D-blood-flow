@@ -9,6 +9,13 @@ A Comprehensive Yet Concise Review" (2025) - sekcje 5, 6, 7
 
 import numpy as np
 import pyvista as pv
+import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+GIFS_DIR = os.path.join(BASE_DIR, "gifs")
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(GIFS_DIR, exist_ok=True)
 
 # ============================================================
 # STAŁE FIZYCZNE
@@ -418,7 +425,7 @@ print()
 # ============================================================
 import csv
 
-csv_filename = "blood_flow_data.csv"
+csv_filename = os.path.join(DATA_DIR, "blood_flow_data.csv")
 time_vals_full = np.linspace(0, T_out, Nt)
 
 with open(csv_filename, mode='w', newline='') as f:
@@ -563,7 +570,7 @@ p.camera_position = [(0.36, -0.24, 0.15),
 p.enable_anti_aliasing()
 p.add_axes()
 
-p.open_gif("blood_flow.gif", fps=25)
+p.open_gif(os.path.join(GIFS_DIR, "blood_flow.gif"), fps=25)
 
 n_cycles = 1
 for cycle in range(n_cycles):

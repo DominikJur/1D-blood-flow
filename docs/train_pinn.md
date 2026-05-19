@@ -25,10 +25,13 @@ Outputs:
 
 The PDE residual is computed in physical units by de-normalizing A_hat and Q_hat.
 
-## Physics (Linear Tube Law)
-- Tube law: P = beta * (A - A0)
-- Wave speed: c = sqrt(beta * A / rho)
-- Riemann invariants: W1 = u + 2c, W2 = u - 2c
+## Physics (Nonlinear Tube Law)
+- Tube law: P = beta * (sqrt(A) - sqrt(A0))
+- Wave speed: c = sqrt(beta / (2 * rho)) * A^(1/4)
+- Riemann invariants: W1 = u + 4c, W2 = u - 4c
+
+## Positivity Constraint
+- The area output (A_hat) is strictly bounded to be positive using a `Softplus` activation. This is essential to prevent negative or zero area predictions, which would cause the 1/A and 1/sqrt(A) terms in the physical equations to explode and derail the training gradients.
 
 ## Loss Terms
 Total loss = data + PDE + BC.
@@ -45,7 +48,7 @@ Total loss = data + PDE + BC.
 3. L-BFGS on the combined loss (data + PDE + BC).
 
 ## Outputs
-- pinn_blood_flow_model (DeepXDE saved model).
+- pinn_blood_flow_model.pth (PyTorch state_dict).
 - pinn_prediction.csv (grid predictions).
 
 ## GPU Notes

@@ -22,6 +22,17 @@ import os
 import argparse
 import pyvista as pv
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+GIFS_DIR = os.path.join(BASE_DIR, "gifs")
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(GIFS_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+
 dde.config.set_default_float("float64")
 torch.set_default_dtype(torch.float64)
 
@@ -36,7 +47,7 @@ def parse_args():
     )
     parser.add_argument(
         "--model-path",
-        default="pinn_blood_flow_model.pth",
+        default=os.path.join(MODELS_DIR, "pinn_blood_flow_model.pth"),
         help="Path to the model state_dict."
     )
     return parser.parse_args()
@@ -139,8 +150,9 @@ def denorm_output(y_hat):
 # ============================================================
 # WCZYTANIE DANYCH
 # ============================================================
-print("Wczytywanie blood_flow_data.csv...")
-df = pd.read_csv("blood_flow_data.csv")
+data_path = os.path.join(DATA_DIR, "blood_flow_data.csv")
+print(f"Wczytywanie {data_path}...")
+df = pd.read_csv(data_path)
 
 df_p = df[df["vessel"] == "parent"].copy()
 df_d1 = df[df["vessel"] == "daughter1"].copy()
@@ -615,8 +627,9 @@ for i, t_val in enumerate(t_grid):
         print(f"  Predykcja: {i+1}/{Nt_grid}")
 
 df_pred = pd.DataFrame(rows, columns=["t", "z", "vessel", "A", "Q"])
-df_pred.to_csv("pinn_prediction.csv", index=False)
-print("Zapisano pinn_prediction.csv")
+pred_csv_path = os.path.join(DATA_DIR, "pinn_prediction.csv")
+df_pred.to_csv(pred_csv_path, index=False)
+print(f"Zapisano {pred_csv_path}")
 
 # ============================================================
 # WIZUALIZACJA 3D - PyVista (predykcje PINN)
@@ -738,7 +751,7 @@ p.camera_position = [(0.36, -0.24, 0.15),
 p.enable_anti_aliasing()
 p.add_axes()
 
-p.open_gif("pinn_prediction.gif", fps=25)
+p.open_gif(os.path.join(GIFS_DIR, "pinn_prediction.gif"), fps=25)
 
 n_cycles = 1
 for cycle in range(n_cycles):

@@ -2,9 +2,19 @@ import imageio.v3 as iio
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GIFS_DIR = os.path.join(BASE_DIR, "gifs")
+os.makedirs(GIFS_DIR, exist_ok=True)
+
+path1 = os.path.join(GIFS_DIR, "blood_flow.gif")
+path2 = os.path.join(GIFS_DIR, "pinn_prediction.gif")
+out_path = os.path.join(GIFS_DIR, "comparison.gif")
+
 print("Wczytywanie animacji...")
-frames1 = iio.imread("blood_flow.gif", index=None)
-frames2 = iio.imread("pinn_prediction.gif", index=None)
+frames1 = iio.imread(path1, index=None)
+frames2 = iio.imread(path2, index=None)
 
 min_len = min(len(frames1), len(frames2))
 print(f"blood_flow.gif: {len(frames1)} frames")
@@ -43,6 +53,6 @@ for i in range(min_len):
     
     new_frames.append(np.array(new_im))
 
-print("Zapisywanie comparison.gif...")
-iio.imwrite("comparison.gif", new_frames, plugin="pillow", duration=1000/25, loop=0)
+print(f"Zapisywanie {out_path}...")
+iio.imwrite(out_path, new_frames, plugin="pillow", duration=1000/25, loop=0)
 print("Gotowe!")
