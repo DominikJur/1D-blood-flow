@@ -1,0 +1,358 @@
+nohup: zignorowane dane wejściowe
+Using backend: pytorch
+Other supported backends: tensorflow.compat.v1, tensorflow, jax, paddle.
+paddle supports more examples now and is recommended.
+Set the default float type to float64
+
+============================================================
+PINN: straight_tube (TRAIN)
+============================================================
+Loading /home/studenci/repo/1D-blood-flow/data/straight_tube_blood_flow_data.csv...
+  625100 total -> 12502 train points
+
+Step 1: Supervised pre-training
+Compiling model...
+'compile' took 0.424513 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+0         [9.48e-02]    [1.76e-01]    []  
+3000      [9.74e-03]    [4.77e-02]    []  
+6000      [5.02e-05]    [2.02e-04]    []  
+9000      [3.44e-05]    [1.59e-04]    []  
+12000     [3.72e-05]    [1.30e-04]    []  
+15000     [1.65e-05]    [6.92e-05]    []  
+
+Best model at step 15000:
+  train loss: 1.65e-05
+  test loss: 6.92e-05
+  test metric: []
+
+'train' took 226.727105 s
+
+Compiling model...
+'compile' took 0.000082 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+15000     [1.65e-05]    [6.92e-05]    []  
+16000     [8.51e-06]    [3.94e-05]    []  
+17000     [4.30e-06]    [2.00e-05]    []  
+18000     [1.35e-06]    [7.35e-06]    []  
+19000     [8.64e-07]    [4.66e-06]    []  
+19646     [8.43e-07]    [4.52e-06]    []  
+20271     [8.40e-07]    [4.51e-06]    []  
+20896     [8.39e-07]    [4.50e-06]    []  
+21521     [8.37e-07]    [4.49e-06]    []  
+22146     [8.36e-07]    [4.48e-06]    []  
+22771     [8.35e-07]    [4.48e-06]    []  
+23396     [8.35e-07]    [4.47e-06]    []  
+24021     [8.34e-07]    [4.47e-06]    []  
+24646     [8.33e-07]    [4.46e-06]    []  
+25271     [8.32e-07]    [4.46e-06]    []  
+25896     [8.32e-07]    [4.46e-06]    []  
+26521     [8.31e-07]    [4.45e-06]    []  
+27146     [8.30e-07]    [4.45e-06]    []  
+27771     [8.30e-07]    [4.45e-06]    []  
+28396     [8.29e-07]    [4.45e-06]    []  
+29021     [8.28e-07]    [4.44e-06]    []  
+29646     [8.28e-07]    [4.44e-06]    []  
+30271     [8.27e-07]    [4.44e-06]    []  
+
+Best model at step 30271:
+  train loss: 8.27e-07
+  test loss: 4.44e-06
+  test metric: []
+
+'train' took 479.483766 s
+
+[0m[33m2026-05-20 13:56:30.848 (4008.445s) [    7FEDC9F6F780]vtkXOpenGLRenderWindow.:1460  WARN| bad X server connection. DISPLAY=[0m
+
+Step 2: Fine-tuning with PDE + BC (device: cuda)
+  iter 2000/20000: total=1.2647e-01 data=3.0555e-02 pde=6.2564e-02 bc=3.3348e-02
+  iter 4000/20000: total=5.8700e-02 data=1.3692e-02 pde=2.7298e-02 bc=1.7711e-02
+  iter 6000/20000: total=5.8089e-02 data=1.0937e-02 pde=3.1941e-02 bc=1.5211e-02
+  iter 8000/20000: total=6.3933e-02 data=9.7391e-03 pde=4.0224e-02 bc=1.3970e-02
+  iter 10000/20000: total=4.7125e-02 data=9.1049e-03 pde=2.4767e-02 bc=1.3253e-02
+  iter 12000/20000: total=4.1983e-02 data=8.7067e-03 pde=2.0705e-02 bc=1.2571e-02
+  iter 14000/20000: total=4.2673e-02 data=8.4958e-03 pde=2.1969e-02 bc=1.2208e-02
+  iter 16000/20000: total=3.5547e-02 data=8.1979e-03 pde=1.5556e-02 bc=1.1793e-02
+  iter 18000/20000: total=3.3717e-02 data=7.8028e-03 pde=1.5122e-02 bc=1.0793e-02
+  iter 20000/20000: total=3.2009e-02 data=7.6272e-03 pde=1.4211e-02 bc=1.0171e-02
+  L-BFGS fine-tuning...
+  Model saved: /home/studenci/repo/1D-blood-flow/models/straight_tube_pinn.pth
+Generating predictions...
+  Pred: 25/202
+  Pred: 50/202
+  Pred: 75/202
+  Pred: 100/202
+  Pred: 125/202
+  Pred: 150/202
+  Pred: 175/202
+  Pred: 200/202
+Generating PINN GIF...
+Saved /home/studenci/repo/1D-blood-flow/gifs/straight_tube_pinn_prediction.gif
+
+============================================================
+PINN: y_bifurcation (TRAIN)
+============================================================
+Loading /home/studenci/repo/1D-blood-flow/data/y_bifurcation_blood_flow_data.csv...
+  1215162 total -> 24304 train points
+
+Step 1: Supervised pre-training
+Compiling model...
+'compile' took 0.000060 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+0         [1.97e-02]    [9.43e-02]    []  
+3000      [1.00e-04]    [1.70e-03]    []  
+6000      [2.04e-05]    [1.75e-04]    []  
+9000      [1.99e-05]    [8.17e-05]    []  
+12000     [8.04e-06]    [4.98e-05]    []  
+15000     [8.44e-06]    [5.81e-05]    []  
+
+Best model at step 12000:
+  train loss: 8.04e-06
+  test loss: 4.98e-05
+  test metric: []
+
+'train' took 423.517700 s
+
+Compiling model...
+'compile' took 0.000066 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+15000     [8.44e-06]    [5.81e-05]    []  
+16000     [2.91e-06]    [2.45e-05]    []  
+17000     [1.16e-06]    [1.14e-05]    []  
+18000     [6.36e-07]    [6.09e-06]    []  
+18833     [6.30e-07]    [6.05e-06]    []  
+19666     [6.27e-07]    [6.03e-06]    []  
+20499     [6.24e-07]    [6.01e-06]    []  
+21332     [6.22e-07]    [5.99e-06]    []  
+22165     [6.21e-07]    [5.97e-06]    []  
+22998     [6.19e-07]    [5.96e-06]    []  
+23831     [6.17e-07]    [5.95e-06]    []  
+24664     [6.16e-07]    [5.93e-06]    []  
+25497     [6.15e-07]    [5.92e-06]    []  
+26330     [6.14e-07]    [5.91e-06]    []  
+27062     [6.13e-07]    [5.90e-06]    []  
+27687     [6.12e-07]    [5.90e-06]    []  
+28312     [6.12e-07]    [5.89e-06]    []  
+28937     [6.11e-07]    [5.89e-06]    []  
+29562     [6.11e-07]    [5.88e-06]    []  
+30187     [6.10e-07]    [5.88e-06]    []  
+
+Best model at step 30187:
+  train loss: 6.10e-07
+  test loss: 5.88e-06
+  test metric: []
+
+'train' took 733.761467 s
+
+
+Step 2: Fine-tuning with PDE + BC (device: cuda)
+  iter 2000/20000: total=9.5270e-03 data=1.6560e-04 pde=8.8967e-03 bc=4.6474e-04
+  iter 4000/20000: total=7.0619e-03 data=1.2148e-04 pde=6.5967e-03 bc=3.4370e-04
+  iter 6000/20000: total=3.1473e-03 data=9.9402e-05 pde=2.7644e-03 bc=2.8348e-04
+  iter 8000/20000: total=2.4511e-03 data=7.6306e-05 pde=2.1418e-03 bc=2.3302e-04
+  iter 10000/20000: total=2.6772e-03 data=6.4038e-05 pde=2.4019e-03 bc=2.1125e-04
+  iter 12000/20000: total=2.2040e-03 data=5.9594e-05 pde=1.9508e-03 bc=1.9355e-04
+  iter 14000/20000: total=1.8233e-03 data=5.1729e-05 pde=1.6059e-03 bc=1.6562e-04
+  iter 16000/20000: total=1.9580e-03 data=5.0577e-05 pde=1.7471e-03 bc=1.6038e-04
+  iter 18000/20000: total=1.6145e-03 data=4.4694e-05 pde=1.4314e-03 bc=1.3841e-04
+  iter 20000/20000: total=1.9322e-03 data=4.5099e-05 pde=1.7506e-03 bc=1.3648e-04
+  L-BFGS fine-tuning...
+  Model saved: /home/studenci/repo/1D-blood-flow/models/y_bifurcation_pinn.pth
+Generating predictions...
+  Pred: 25/203
+  Pred: 50/203
+  Pred: 75/203
+  Pred: 100/203
+  Pred: 125/203
+  Pred: 150/203
+  Pred: 175/203
+  Pred: 200/203
+Generating PINN GIF...
+Saved /home/studenci/repo/1D-blood-flow/gifs/y_bifurcation_pinn_prediction.gif
+
+============================================================
+PINN: split_merge (TRAIN)
+============================================================
+Loading /home/studenci/repo/1D-blood-flow/data/split_merge_blood_flow_data.csv...
+  1440000 total -> 28800 train points
+
+Step 1: Supervised pre-training
+Compiling model...
+'compile' took 0.000062 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+0         [4.87e-02]    [7.16e-02]    []  
+3000      [1.50e-03]    [1.27e-03]    []  
+6000      [5.87e-05]    [7.77e-05]    []  
+9000      [2.02e-05]    [1.82e-05]    []  
+12000     [1.72e-05]    [3.17e-05]    []  
+15000     [1.57e-05]    [3.83e-05]    []  
+
+Best model at step 15000:
+  train loss: 1.57e-05
+  test loss: 3.83e-05
+  test metric: []
+
+'train' took 494.713263 s
+
+Compiling model...
+'compile' took 0.000065 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+15000     [1.57e-05]    [3.83e-05]    []  
+16000     [4.02e-06]    [6.23e-06]    []  
+17000     [2.40e-06]    [3.35e-06]    []  
+18000     [1.63e-06]    [2.18e-06]    []  
+19000     [1.23e-06]    [1.49e-06]    []  
+19645     [1.22e-06]    [1.52e-06]    []  
+20270     [1.22e-06]    [1.51e-06]    []  
+20895     [1.22e-06]    [1.51e-06]    []  
+21520     [1.22e-06]    [1.50e-06]    []  
+22145     [1.21e-06]    [1.50e-06]    []  
+22770     [1.21e-06]    [1.49e-06]    []  
+23395     [1.21e-06]    [1.49e-06]    []  
+24020     [1.21e-06]    [1.48e-06]    []  
+24645     [1.21e-06]    [1.48e-06]    []  
+25270     [1.21e-06]    [1.48e-06]    []  
+25895     [1.21e-06]    [1.47e-06]    []  
+26520     [1.21e-06]    [1.47e-06]    []  
+27145     [1.21e-06]    [1.47e-06]    []  
+27770     [1.20e-06]    [1.46e-06]    []  
+28395     [1.20e-06]    [1.46e-06]    []  
+29020     [1.20e-06]    [1.46e-06]    []  
+29645     [1.20e-06]    [1.45e-06]    []  
+30270     [1.20e-06]    [1.45e-06]    []  
+
+Best model at step 30270:
+  train loss: 1.20e-06
+  test loss: 1.45e-06
+  test metric: []
+
+'train' took 964.301114 s
+
+
+Step 2: Fine-tuning with PDE + BC (device: cuda)
+  iter 2000/20000: total=3.7408e-02 data=1.0550e-03 pde=3.2898e-02 bc=3.4544e-03
+  iter 4000/20000: total=1.6066e-02 data=6.2705e-04 pde=1.3758e-02 bc=1.6810e-03
+  iter 6000/20000: total=7.8942e-03 data=5.6093e-04 pde=6.0808e-03 bc=1.2525e-03
+  iter 8000/20000: total=8.8923e-03 data=5.2279e-04 pde=7.3051e-03 bc=1.0644e-03
+  iter 10000/20000: total=6.2452e-03 data=4.7235e-04 pde=4.8754e-03 bc=8.9753e-04
+  iter 12000/20000: total=6.7692e-03 data=4.3239e-04 pde=5.5459e-03 bc=7.9087e-04
+  iter 14000/20000: total=5.5792e-03 data=3.8982e-04 pde=4.5196e-03 bc=6.6976e-04
+  iter 16000/20000: total=4.1714e-03 data=3.5872e-04 pde=3.2245e-03 bc=5.8813e-04
+  iter 18000/20000: total=3.6478e-03 data=3.3087e-04 pde=2.8056e-03 bc=5.1140e-04
+  iter 20000/20000: total=4.9658e-03 data=3.1167e-04 pde=4.2031e-03 bc=4.5097e-04
+  L-BFGS fine-tuning...
+  Model saved: /home/studenci/repo/1D-blood-flow/models/split_merge_pinn.pth
+Generating predictions...
+  Pred: 25/203
+  Pred: 50/203
+  Pred: 75/203
+  Pred: 100/203
+  Pred: 125/203
+  Pred: 150/203
+  Pred: 175/203
+  Pred: 200/203
+Generating PINN GIF...
+Saved /home/studenci/repo/1D-blood-flow/gifs/split_merge_pinn_prediction.gif
+
+============================================================
+PINN: double_y (TRAIN)
+============================================================
+Loading /home/studenci/repo/1D-blood-flow/data/double_y_blood_flow_data.csv...
+  1890252 total -> 37806 train points
+
+Step 1: Supervised pre-training
+Compiling model...
+'compile' took 0.000064 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+0         [1.39e-01]    [1.01e-01]    []  
+3000      [2.11e-03]    [1.74e-02]    []  
+6000      [2.10e-03]    [1.68e-02]    []  
+9000      [9.10e-04]    [1.33e-02]    []  
+12000     [1.82e-04]    [2.79e-03]    []  
+15000     [1.02e-04]    [1.58e-03]    []  
+
+Best model at step 15000:
+  train loss: 1.02e-04
+  test loss: 1.58e-03
+  test metric: []
+
+'train' took 628.024298 s
+
+Compiling model...
+'compile' took 0.000064 s
+
+Training model...
+
+Step      Train loss    Test loss     Test metric
+15000     [1.02e-04]    [1.58e-03]    []  
+16000     [2.38e-05]    [1.49e-04]    []  
+17000     [1.41e-05]    [7.74e-05]    []  
+18000     [1.09e-05]    [3.50e-05]    []  
+19000     [9.49e-06]    [2.42e-05]    []  
+20000     [8.16e-06]    [1.85e-05]    []  
+21000     [6.90e-06]    [1.35e-05]    []  
+22000     [5.95e-06]    [1.07e-05]    []  
+23000     [5.17e-06]    [1.01e-05]    []  
+24000     [4.25e-06]    [6.87e-06]    []  
+25000     [3.75e-06]    [5.56e-06]    []  
+26000     [3.34e-06]    [5.02e-06]    []  
+27000     [2.97e-06]    [4.66e-06]    []  
+28000     [2.56e-06]    [4.03e-06]    []  
+29000     [2.07e-06]    [3.76e-06]    []  
+30000     [1.63e-06]    [3.50e-06]    []  
+
+Best model at step 30000:
+  train loss: 1.63e-06
+  test loss: 3.50e-06
+  test metric: []
+
+'train' took 768.243890 s
+
+
+Step 2: Fine-tuning with PDE + BC (device: cuda)
+  iter 2000/20000: total=1.0765e-01 data=2.9853e-03 pde=9.1061e-02 bc=1.3604e-02
+  iter 4000/20000: total=4.8450e-02 data=2.4026e-03 pde=4.0867e-02 bc=5.1795e-03
+  iter 6000/20000: total=5.0788e-02 data=2.7791e-03 pde=4.0834e-02 bc=7.1742e-03
+  iter 8000/20000: total=2.5667e-02 data=2.7744e-03 pde=1.8280e-02 bc=4.6132e-03
+  iter 10000/20000: total=1.1007e-01 data=2.3320e-03 pde=1.0388e-01 bc=3.8607e-03
+  iter 12000/20000: total=5.3403e-02 data=2.5110e-03 pde=4.4427e-02 bc=6.4651e-03
+  iter 14000/20000: total=3.1567e-02 data=2.0731e-03 pde=2.6787e-02 bc=2.7066e-03
+  iter 16000/20000: total=1.8822e-02 data=2.1850e-03 pde=1.3296e-02 bc=3.3410e-03
+  iter 18000/20000: total=3.6261e-02 data=1.9933e-03 pde=3.1720e-02 bc=2.5473e-03
+  iter 20000/20000: total=1.7555e-02 data=2.0766e-03 pde=1.2858e-02 bc=2.6198e-03
+  L-BFGS fine-tuning...
+  Model saved: /home/studenci/repo/1D-blood-flow/models/double_y_pinn.pth
+Generating predictions...
+  Pred: 25/203
+  Pred: 50/203
+  Pred: 75/203
+  Pred: 100/203
+  Pred: 125/203
+  Pred: 150/203
+  Pred: 175/203
+  Pred: 200/203
+Generating PINN GIF...
+Saved /home/studenci/repo/1D-blood-flow/gifs/double_y_pinn_prediction.gif
+
+All done!
