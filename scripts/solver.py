@@ -40,7 +40,7 @@ def build_vessel_grid(x_c, y_c, z_c, R_vals):
 
 def export_csv(topo_name, vessels, Nt, T_out):
     csv_path = os.path.join(DATA_DIR, f"{topo_name}_blood_flow_data.csv")
-    time_vals = np.linspace(0, T_out, Nt)
+    time_vals = np.arange(Nt) * (T_out / Nt)
     with open(csv_path, 'w', newline='') as f:
         w = csv.writer(f)
         w.writerow(["t", "vessel", "z", "A", "Q"])
@@ -64,7 +64,7 @@ def export_gif(topo_name, topo_cfg, vessels, Nt, T_out):
 
     step = max(1, Nt // 200)
     frame_indices = list(range(0, Nt, step))
-    time_vals = np.linspace(0, T_out, Nt)
+    time_vals = np.arange(Nt) * (T_out / Nt)
 
     # Compute global Q max
     Qmax = 1e-10

@@ -1,7 +1,7 @@
 [project]
 name = "1d-blood-flow"
 version = "0.1.0"
-description = "Add your description here"
+description = "1D blood flow in arterial topologies (straight tube, Y-bifurcation, split-merge, double-Y): MUSCL finite-volume solver plus per-topology DeepXDE PINN surrogates, with 3D GIF visualization"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
