@@ -3,7 +3,7 @@
 One-dimensional blood flow in arterial topologies, simulated with a finite-volume MUSCL
 solver and emulated with physics-informed neural networks (DeepXDE + PyTorch, one PINN per
 topology). Methodology follows Kim & Tithof, "One-Dimensional Modeling of Blood Flow"
-(arXiv:2508.18484, PDF in `research_papers/1d_blood_flow_math.pdf`).
+(arXiv:2508.18484).
 
 Y-bifurcation, MUSCL solver (flow rate Q, vessel radius exaggerated to show deformation):
 
@@ -37,7 +37,7 @@ uv sync                                  # Python 3.13
 uv run python scripts/solver.py          # simulate all topologies -> data/*.csv + gifs/*_blood_flow.gif
 uv run python scripts/train_pinn.py --train   # train one PINN per topology -> models/*.pth + gifs/*_pinn_prediction.gif
 uv run python scripts/aggregate_gifs.py  # side-by-side MUSCL-vs-PINN GIFs -> gifs/*_comparison.gif
-uv run python scripts/draw_pignn_diagrams.py  # PIGNN architecture diagrams -> research_papers/*.png
+uv run python scripts/draw_pignn_diagrams.py  # diagrams -> research_papers/*.png (local only)
 ```
 
 `scripts/train_pinn.py --topo y_bifurcation` runs a single topology; without `--train` it
@@ -51,8 +51,10 @@ only evaluates a saved model and renders its prediction GIF.
 - `scripts/train_pinn.py` — per-topology PINN training / evaluation
 - `scripts/aggregate_gifs.py`, `scripts/draw_pignn_diagrams.py` — comparison GIFs, diagrams
 - `data/` — solver CSVs (gitignored, regenerate with `scripts/solver.py`)
-- `gifs/`, `models/`, `logs/` — committed animations, trained weights, training logs
-- `docs/`, `reports/`, `research_papers/`, `presentations/` — notes, alignment report, papers, talks
+- `gifs/`, `models/` — committed animations and trained weights
+- `docs/` — solver / PINN notes
+- local only (gitignored): `data/` solver CSVs, `logs/`, `reports/`, `research_papers/`,
+  `presentations/`
 
 ## Model
 
@@ -83,15 +85,12 @@ solved by a scaled, damped Newton-Raphson iteration.
 | `models/<topo>_pinn.pth` | `scripts/train_pinn.py` | yes |
 | `gifs/<topo>_pinn_prediction.gif` | `scripts/train_pinn.py` | yes |
 | `gifs/<topo>_comparison.gif` | `scripts/aggregate_gifs.py` | yes |
-| `logs/train_all.log` | `scripts/train_pinn.py` | yes |
+| `logs/train_all.log` | `scripts/train_pinn.py` | no (gitignored) |
 
 ## References
 
-- D. Kim, J. Tithof, arXiv:2508.18484 — `research_papers/1d_blood_flow_math.pdf`
-- M. Raissi, P. Perdikaris, G. E. Karniadakis, arXiv:1711.10561 — `research_papers/pinns_original.pdf`
-- PIGNN for 1D blood flow — `research_papers/pignn_for_1d_blood_flow.pdf`
+- D. Kim, J. Tithof, "One-Dimensional Modeling of Blood Flow", arXiv:2508.18484 — https://arxiv.org/abs/2508.18484
+- M. Raissi, P. Perdikaris, G. E. Karniadakis, "Physics-informed neural networks", arXiv:1711.10561 — https://arxiv.org/abs/1711.10561
+- PIGNN for 1D blood flow (local PDF kept in the gitignored `research_papers/`)
 
-(`research_papers/BYOL.pdf` and `self-distillation.pdf` are unrelated reference PDFs.)
-
-Matematyka dla Przemyslu project: Dominik Jur, Szymon Klim, Miroslaw Myszka,
-Nikodem Drelak (see `presentations/`).
+Matematyka dla Przemyslu project: Dominik Jur, Szymon Klim, Miroslaw Myszka, Nikodem Drelak.

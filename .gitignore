@@ -1,5 +1,9 @@
 /.venv
 data/
+logs/
+reports/
+research_papers/
+presentations/
 __pycache__/
 *.pyc
 *.pyo

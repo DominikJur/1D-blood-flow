@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
@@ -33,6 +34,7 @@ draw_arrow(ax, 4.8, 2.7, 5.7, 3.1)
 draw_arrow(ax, 6.4, 3.2, 7.1, 3.2)
 draw_arrow(ax, 4.8, 2.3, 5.7, 1.9)
 draw_arrow(ax, 6.4, 1.8, 7.1, 1.8)
+os.makedirs("research_papers", exist_ok=True)
 plt.savefig("research_papers/diagram1_topology.png", bbox_inches='tight', dpi=150)
 plt.close()
 

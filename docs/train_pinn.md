@@ -53,7 +53,7 @@ Total loss = data + PDE + BC.
 ## Outputs
 - models/<topology>_pinn.pth (PyTorch state_dict).
 - gifs/<topology>_pinn_prediction.gif (prediction animation).
-- logs/train_all.log (training log).
+- logs/train_all.log (training log, gitignored).
 
 ## GPU Notes
 - Uses torch.device("cuda" if available).
