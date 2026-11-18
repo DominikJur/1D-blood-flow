@@ -1,8 +1,9 @@
-# Solver (solver.py)
+# Solver (scripts/solver.py + scripts/simulation_engine.py)
 
 ## Purpose
-Simulate 1D blood flow in a Y-shaped bifurcation using a finite-volume scheme and export
-results for PINN training and visualization.
+Simulate 1D blood flow in several arterial topologies (straight tube, Y-bifurcation,
+split-merge, double-Y) with a finite-volume scheme, and export results for PINN training
+and visualization.
 
 ## Model Summary
 - Variables: cross-sectional area A, flow rate Q, pressure P.
@@ -18,6 +19,9 @@ results for PINN training and visualization.
 - Spatial: MUSCL reconstruction with minmod limiter.
 - Flux: Rusanov (Lax-Friedrichs).
 - Time: explicit Adams-Bashforth 2nd order.
+- CFL = 0.30 (scripts/topology_config.py). CFL = 0.45 is unstable with AB2 here:
+  2*dx odd-even oscillations develop and A drops below zero; CFL <= 0.30 runs the full
+  0.75 s cleanly.
 
 ## Boundary Conditions
 - Inlet (parent, z=0): prescribed Q_in(t), solve for A using W2 extrapolation.
@@ -28,17 +32,18 @@ results for PINN training and visualization.
   - Riemann invariant matching (W1 for parent, W2 for daughters).
 
 ## Inputs and Outputs
-- Inputs: vessel lengths, radii, c0, time horizon, CFL; defined in the file.
+- Inputs: per-topology vessel geometry, junctions, inflow and T_out; defined in
+  scripts/topology_config.py (CFL lives there too).
 - Outputs:
-  - blood_flow_data.csv with columns: t, vessel, z, A, Q.
-  - blood_flow.gif visualization (requires PyVista).
+  - data/<topology>_blood_flow_data.csv with columns: t, vessel, z, A, Q
+    (data/ is gitignored; regenerate with scripts/solver.py).
+  - gifs/<topology>_blood_flow.gif 3D animation (requires PyVista, off-screen).
 
 ## Running
-- Run the script directly: it performs the simulation and writes outputs.
-- If you change the tube law or parameters, regenerate blood_flow_data.csv before PINN training.
+- `uv run python scripts/solver.py` runs all topologies and writes CSV + GIF per topology.
+- If you change the tube law or parameters, regenerate data/*.csv before PINN training.
 
 ## Notes
 - The solver uses a nonlinear tube law (P proportional to sqrt(A)). If you switch to another model,
   update pressure, wave speed, flux, and Riemann invariants consistently.
-- PyVista is required for the GIF; you can comment out the visualization section
-  if you only need CSV output.
+- PyVista is required for the GIF export in scripts/solver.py.

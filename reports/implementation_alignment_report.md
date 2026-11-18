@@ -1,5 +1,16 @@
 # Implementation Alignment Report
 
+## Status update (resolved)
+
+- Tube law: the nonlinear law P = beta*(sqrt(A) - sqrt(A0)) with Riemann invariants
+  W = u +/- 4c is used consistently in scripts/simulation_engine.py and
+  scripts/train_pinn.py (Option A below; the decision section is kept as history).
+- Stability: CFL = 0.30 in scripts/topology_config.py (0.45 is unstable with AB2:
+  2*dx odd-even oscillations, A < 0).
+- Junctions (bifurcation / merge / conjunction): scaled, damped Newton-Raphson with
+  a floor at 0.1*A0.
+
+
 This report summarizes required changes to align the solver and PINN with:
 - [research_papers/2508.18484v1.pdf](research_papers/2508.18484v1.pdf)
 - [research_papers/1711.10561v1.pdf](research_papers/1711.10561v1.pdf)
