@@ -1,2 +1,9 @@
 /.venv
 data/
+__pycache__/
+*.pyc
+*.pyo
+blood_flow_data.csv
+pinn_prediction.csv
+.ipynb_checkpoints/
+.DS_Store
